@@ -8,8 +8,10 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Str;
 use Rooberthh\Switchboard\Inbox\InboxMessages;
 use Rooberthh\Switchboard\Switchboard;
+use Throwable;
 
 /**
  * Runs the application's handler against a message that is already stored.
@@ -38,7 +40,7 @@ final class ProcessInboxMessage implements ShouldQueue
     public function backoff(): array
     {
         /** @var list<int> $backoff */
-        $backoff = config('switchboard.inbox.backoff', [10, 60, 300, 900]);
+        $backoff = config('switchboard.inbox.backoff') ?: [10, 60, 360, 2160];
 
         return $backoff;
     }
@@ -54,5 +56,40 @@ final class ProcessInboxMessage implements ShouldQueue
         Switchboard::handler($message->provider)->handle($message);
 
         $message->forceFill(['processed_at' => now()])->save();
+    }
+
+    /**
+     * Called once the attempts are spent. Until then the message stays
+     * unprocessed: there is no in-flight state and no attempt counter.
+     * @param Throwable $exception
+     */
+    public function failed(Throwable $exception): void
+    {
+        $message = InboxMessages::find($this->inboxMessageId);
+
+        if ($message === null || $message->isProcessed()) {
+            return;
+        }
+
+        $message->forceFill([
+            'failed_at' => now(),
+            'last_error' => self::describe($exception),
+        ])->save();
+    }
+
+    /**
+     * Enough to diagnose the failure without reproducing it, and bounded, so
+     * one pathological exception cannot fill the column.
+     * @param Throwable $exception
+     */
+    private static function describe(Throwable $exception): string
+    {
+        return Str::limit(sprintf(
+            '%s: %s in %s:%d',
+            $exception::class,
+            $exception->getMessage(),
+            $exception->getFile(),
+            $exception->getLine(),
+        ), 2000);
     }
 }

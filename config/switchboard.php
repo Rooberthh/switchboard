@@ -59,7 +59,7 @@ return [
         'path' => env('SWITCHBOARD_INBOX_PATH', 'webhooks'),
         'tolerance' => (int) env('SWITCHBOARD_INBOX_TOLERANCE', 300),
         'tries' => 5,
-        'backoff' => [10, 60, 300, 900],
+        'backoff' => [10, 60, 360, 2160],
     ],
 
     /*

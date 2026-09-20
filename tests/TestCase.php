@@ -9,6 +9,8 @@ use Orchestra\Testbench\TestCase as BaseTestCase;
 use Rooberthh\Switchboard\Switchboard;
 use Rooberthh\Switchboard\SwitchboardServiceProvider;
 
+use function Orchestra\Testbench\default_migration_path;
+
 abstract class TestCase extends BaseTestCase
 {
     use RefreshDatabase;
@@ -46,7 +48,10 @@ abstract class TestCase extends BaseTestCase
 
     protected function defineDatabaseMigrations(): void
     {
-        $this->loadLaravelMigrations();
+        // Testbench's own skeleton migrations, for the jobs table the
+        // processing tests drive a real worker against.
+        $this->loadMigrationsFrom(default_migration_path());
+
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
     }
 }
