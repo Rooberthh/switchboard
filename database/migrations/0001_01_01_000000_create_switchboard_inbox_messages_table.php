@@ -20,25 +20,11 @@ return new class extends Migration {
             $table->timestamp('processed_at')->nullable();
             $table->timestamp('failed_at')->nullable();
             $table->text('last_error')->nullable();
-
-            // Bookkeeping for the relay, not a lifecycle state: a relayed
-            // message is still unprocessed until a handler says otherwise.
             $table->timestamp('relayed_at')->nullable();
             $table->timestamps();
 
-            // Idempotency. The dedupe recovers from a violation of this index,
-            // so without it concurrent retries of one event insert two rows.
             $table->unique(['provider', 'event_id']);
-
             $table->index('subject');
-
-            // Replay, and "what still needs attention", are both this query.
-            $table->index(['provider', 'failed_at']);
-
-            // The relay's sweep: unprocessed, never relayed, old enough. The
-            // three null checks first, then the range, which is the order the
-            // predicate can actually use.
-            $table->index(['processed_at', 'failed_at', 'relayed_at', 'created_at']);
         });
     }
 
