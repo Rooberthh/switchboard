@@ -1,0 +1,69 @@
+{
+    "name": "rooberthh/switchboard",
+    "description": "Inbox and outbox for webhooks in Laravel: verified, deduplicated ingest and transactional delivery.",
+    "type": "library",
+    "keywords": [
+        "laravel",
+        "webhooks",
+        "inbox",
+        "outbox",
+        "standard-webhooks"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Roberth Evaldsson",
+            "email": "evaldsson.roberth@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/rooberthh/switchboard/issues"
+    },
+    "require": {
+        "php": "^8.3",
+        "illuminate/contracts": "^13.0",
+        "illuminate/database": "^13.0",
+        "illuminate/http": "^13.0",
+        "illuminate/queue": "^13.0",
+        "illuminate/routing": "^13.0",
+        "illuminate/support": "^13.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.32",
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^5.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Rooberthh\\Switchboard\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Rooberthh\\Switchboard\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Rooberthh\\Switchboard\\SwitchboardServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "./vendor/bin/pest",
+        "pint": "./vendor/bin/pint",
+        "stan": "./vendor/bin/phpstan analyse --memory-limit=3g"
+    }
+}

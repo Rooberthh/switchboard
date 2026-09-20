@@ -1,0 +1,11 @@
+{
+    "preset": "per",
+    "rules": {
+        "phpdoc_add_missing_param_annotation": {
+            "only_untyped": false
+        },
+        "fully_qualified_strict_types": {
+            "import_symbols": true
+        }
+    }
+}
