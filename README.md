@@ -179,6 +179,76 @@ protected function secret(): string
 }
 ```
 
+## Writing a handler
+
+A handler is where your application acts on a message. It always runs on the
+queue, against a row that is already stored, so slow work never blocks the
+provider and a crash mid-handling cannot lose the event.
+
+Event types map to methods through an explicit registry. Deriving a method name
+from the event type collides silently — `customer.subscription.created` and
+`customer.subscriptionCreated` derive to the same name — and routing two
+different events to the same code is a bug you find late.
+
+```php
+use Rooberthh\Switchboard\Inbox\Handler;
+use Rooberthh\Switchboard\Models\InboxMessage;
+
+final class StripeHandler extends Handler
+{
+    protected array $handles = [
+        'invoice.paid' => 'invoicePaid',
+        'customer.subscription.deleted' => 'subscriptionDeleted',
+    ];
+
+    public function invoicePaid(InboxMessage $message): void
+    {
+        Invoice::query()
+            ->where('stripe_id', $message->subject)
+            ->update(['paid_at' => $message->occurred_at]);
+    }
+
+    public function subscriptionDeleted(InboxMessage $message): void
+    {
+        // $message->data is already decoded.
+    }
+}
+```
+
+Register it next to the driver:
+
+```php
+Switchboard::handledBy('stripe', StripeHandler::class);
+```
+
+An event type with no method reaches `unhandled()`, which logs a warning. That
+is a default, not a rule — override it to throw, to notify, or to ignore:
+
+```php
+protected function unhandled(InboxMessage $message): void
+{
+    // Silence the event types you have decided you do not care about.
+}
+```
+
+To map event types to methods some other way, override `methodFor()`:
+
+```php
+protected function methodFor(InboxMessage $message): ?string
+{
+    return Str::camel(str_replace('.', '_', $message->event_type));
+}
+```
+
+Processing runs on your default queue connection unless you say otherwise:
+
+```php
+'queue' => [
+    'connection' => env('SWITCHBOARD_QUEUE_CONNECTION'),
+    'name' => env('SWITCHBOARD_QUEUE'),
+],
+```
+
 ## Outbox
 
 Emitting webhooks — a transactional `emit()`, endpoints, deliveries, signed

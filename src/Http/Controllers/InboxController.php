@@ -7,6 +7,7 @@ namespace Rooberthh\Switchboard\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Rooberthh\Switchboard\Inbox\InboxMessages;
+use Rooberthh\Switchboard\Jobs\ProcessInboxMessage;
 use Rooberthh\Switchboard\Switchboard;
 use Throwable;
 
@@ -42,7 +43,7 @@ final class InboxController
 
         $data = $driver->normalize($request);
 
-        InboxMessages::createOrFirst(
+        $message = InboxMessages::createOrFirst(
             [
                 'provider' => $provider,
                 'event_id' => $data->eventId,
@@ -54,6 +55,11 @@ final class InboxController
                 'occurred_at' => $data->occurredAt ?? now(),
             ],
         );
+
+        if ($message->wasRecentlyCreated) {
+            // After commit, so a message that is rolled back is never worked on.
+            ProcessInboxMessage::dispatch($message->id)->afterCommit();
+        }
 
         return response()->noContent();
     }

@@ -2,11 +2,17 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Rooberthh\Switchboard\Exceptions\UnknownProvider;
 use Rooberthh\Switchboard\Switchboard;
 use Rooberthh\Switchboard\Tests\Fixtures\FakeDriver;
 use Rooberthh\Switchboard\Tests\Fixtures\MarkerMiddleware;
+
+beforeEach(function () {
+    // This suite is about the request, not about what happens after it.
+    Queue::fake();
+});
 
 it('mounts a provider endpoint at a conventional path derived from the provider key', function () {
     Switchboard::extend('acme', new FakeDriver());

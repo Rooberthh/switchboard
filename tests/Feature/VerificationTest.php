@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Queue;
 use Rooberthh\Switchboard\Contracts\Driver;
 use Rooberthh\Switchboard\Inbox\InboxMessageData;
 use Rooberthh\Switchboard\Models\InboxMessage;
@@ -13,6 +14,9 @@ use Rooberthh\Switchboard\Tests\Fixtures\StandardWebhooksVector as Vector;
 use Illuminate\Testing\TestResponse;
 
 beforeEach(function () {
+    // These suites are about the request, not about what happens after it.
+    Queue::fake();
+
     config(['switchboard.providers.acme.secret' => Vector::SECRET]);
 
     Carbon::setTestNow(Carbon::createFromTimestamp(Vector::TIMESTAMP));

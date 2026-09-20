@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Rooberthh\Switchboard\Contracts\Driver;
 use Rooberthh\Switchboard\Inbox\InboxMessageData;
@@ -13,6 +14,9 @@ use Rooberthh\Switchboard\Tests\Fixtures\FakeDriver;
 use Illuminate\Testing\TestResponse;
 
 beforeEach(function () {
+    // These suites are about the request, not about what happens after it.
+    Queue::fake();
+
     Switchboard::extend('acme', new FakeDriver());
     Switchboard::route('acme');
 });

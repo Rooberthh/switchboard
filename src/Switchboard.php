@@ -8,6 +8,8 @@ use Closure;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Rooberthh\Switchboard\Contracts\Driver;
+use Rooberthh\Switchboard\Contracts\Handler;
+use Rooberthh\Switchboard\Exceptions\UnknownHandler;
 use Rooberthh\Switchboard\Exceptions\UnknownProvider;
 use Rooberthh\Switchboard\Http\Controllers\InboxController;
 
@@ -25,6 +27,9 @@ final class Switchboard
 
     /** @var array<string, Driver> */
     private static array $resolved = [];
+
+    /** @var array<string, Handler|Closure(): Handler|class-string<Handler>> */
+    private static array $handlers = [];
 
     /**
      * Register the driver that reads a provider.
@@ -64,6 +69,45 @@ final class Switchboard
             $driver instanceof Driver => $driver,
             $driver instanceof Closure => $driver(),
             default => app($driver),
+        };
+    }
+
+    /**
+     * Register the handler that acts on a provider's messages. It runs on the
+     * queue, never during the request that delivered the message.
+     *
+     * @param  Handler|Closure(): Handler|class-string<Handler>  $handler
+     * @param string $provider
+     */
+    public static function handledBy(string $provider, Handler|Closure|string $handler): void
+    {
+        self::$handlers[$provider] = $handler;
+    }
+
+    public static function hasHandler(string $provider): bool
+    {
+        return isset(self::$handlers[$provider]);
+    }
+
+    /**
+     * Resolved per message rather than cached, so a handler is free to hold
+     * per-message state.
+     *
+     * @throws UnknownHandler
+     * @param string $provider
+     */
+    public static function handler(string $provider): Handler
+    {
+        if (! isset(self::$handlers[$provider])) {
+            throw UnknownHandler::for($provider);
+        }
+
+        $handler = self::$handlers[$provider];
+
+        return match (true) {
+            $handler instanceof Handler => $handler,
+            $handler instanceof Closure => $handler(),
+            default => app($handler),
         };
     }
 
@@ -110,5 +154,6 @@ final class Switchboard
     {
         self::$drivers = [];
         self::$resolved = [];
+        self::$handlers = [];
     }
 }
