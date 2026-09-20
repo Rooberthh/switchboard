@@ -8,11 +8,10 @@ use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Rooberthh\Switchboard\Actions\Inbox\RelayAction;
 use Rooberthh\Switchboard\Inbox\InboxMessages;
 use Rooberthh\Switchboard\Inbox\Staleness;
-use Rooberthh\Switchboard\Jobs\ProcessInboxMessage;
 use Rooberthh\Switchboard\Models\InboxMessage;
-use Throwable;
 
 /**
  * Queue the messages whose jobs were never queued.
@@ -71,23 +70,12 @@ final class RelayCommand extends Command
     private function relay(Builder $query): int
     {
         $relayed = 0;
+        $relay = app(RelayAction::class);
 
         // Paged by id rather than by offset, like replay: the predicate this
         // pages through is one the sweep itself changes.
-        $query->eachById(function (InboxMessage $message) use (&$relayed): void {
-            // Marked before dispatching, not after, so a run that dies partway
-            // cannot come back and relay the same message a second time.
-            $message->forceFill(['relayed_at' => Carbon::now()])->save();
-
-            try {
-                ProcessInboxMessage::dispatch($message->id);
-            } catch (Throwable $e) {
-                // The queue is still part of the outage. Leave the message
-                // exactly as it was so the next run can try again.
-                $message->forceFill(['relayed_at' => null])->save();
-
-                throw $e;
-            }
+        $query->eachById(function (InboxMessage $message) use (&$relayed, $relay): void {
+            $relay->execute($message);
 
             $relayed++;
         });

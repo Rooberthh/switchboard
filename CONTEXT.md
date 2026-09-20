@@ -53,6 +53,10 @@ _Avoid_: entity id, object id, resource, target
 A message that has neither succeeded nor failed yet. Switchboard has no in-flight state: a message being worked on right now is still unprocessed.
 _Avoid_: pending, queued, in progress
 
+**Marking processed**:
+Recording that a handler succeeded. Distinct from *processing*, which is the handler running on the queue: the handler does the work, marking is the record of it, and only the record moves a message out of unprocessed. The same split holds for failing a message.
+_Avoid_: completing, finishing, closing
+
 **Reconciliation**:
 Asking a provider for the events it says it sent, to find the ones that never arrived.
 _Avoid_: backfill, catch-up, sync

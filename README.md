@@ -500,7 +500,7 @@ Switchboard follows semantic versioning. What that covers:
 | `Events\*` | Events | Observation points. They carry the message and will keep carrying it. |
 | `Models\InboxMessage` | Model | Deliberately not `final`; an application may extend it. Nothing in the package names it except one internal resolver, so a model-swap configurator stays a one-line addition. |
 | `config/switchboard.php` | Configuration | Data only: table names, queues, tolerances, retries. |
-| `Http\*`, `Jobs\*`, `Console\*`, `Inbox\InboxMessages`, `Inbox\Staleness` | **Internal** | `final` and `@internal`. Swap behaviour through a seam above, never by subclassing these. They change without a major version. |
+| `Actions\*`, `Http\*`, `Jobs\*`, `Console\*`, `Inbox\InboxMessages`, `Inbox\Staleness` | **Internal** | `final` and `@internal`. Swap behaviour through a seam above, never by subclassing these. They change without a major version. |
 
 A test asserts this boundary, so it cannot drift silently.
 

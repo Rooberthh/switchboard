@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard\Console;
 
 use Illuminate\Console\Command;
+use Rooberthh\Switchboard\Actions\Inbox\ReplayAction;
 use Rooberthh\Switchboard\Inbox\InboxMessages;
-use Rooberthh\Switchboard\Jobs\ProcessInboxMessage;
 use Rooberthh\Switchboard\Models\InboxMessage;
-use Throwable;
 
 /**
  * Re-run messages that failed, without asking the provider to resend.
@@ -45,35 +44,13 @@ final class ReplayCommand extends Command
         }
 
         $replayed = 0;
+        $replay = app(ReplayAction::class);
 
-        // Only failed messages are eligible: re-running one that succeeded
-        // would repeat side effects the application already performed.
-        //
         // Paged by id, not by offset: clearing failed_at removes the row from
         // this query, so offset paging would step over as many messages as it
         // replayed.
-        $query->eachById(function (InboxMessage $message) use (&$replayed): void {
-            $failedAt = $message->failed_at;
-            $lastError = $message->last_error;
-
-            $message->forceFill([
-                'failed_at' => null,
-                'last_error' => null,
-            ])->save();
-
-            try {
-                ProcessInboxMessage::dispatch($message->id);
-            } catch (Throwable $e) {
-                // The queue is part of the outage too. Put the message back
-                // rather than leaving it unprocessed with no job to process
-                // it and its diagnosis erased.
-                $message->forceFill([
-                    'failed_at' => $failedAt,
-                    'last_error' => $lastError,
-                ])->save();
-
-                throw $e;
-            }
+        $query->eachById(function (InboxMessage $message) use (&$replayed, $replay): void {
+            $replay->execute($message);
 
             $replayed++;
         });

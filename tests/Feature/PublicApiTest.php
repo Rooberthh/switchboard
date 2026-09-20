@@ -35,7 +35,7 @@ function isInternal(string $class): bool
         'Rooberthh\\Switchboard\\Inbox\\Staleness',
     ];
 
-    $namespaces = ['Console', 'Http', 'Jobs'];
+    $namespaces = ['Actions', 'Console', 'Http', 'Jobs'];
 
     return in_array($class, $named, true)
         || collect($namespaces)->contains(
