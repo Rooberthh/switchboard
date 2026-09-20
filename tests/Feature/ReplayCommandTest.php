@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Switchboard;
 use Rooberthh\Switchboard\Tests\Fixtures\FakeDriver;
@@ -135,4 +137,58 @@ it('records the new error when a replayed message fails again', function () {
     expect($message->isFailed())->toBeTrue()
         ->and($message->last_error)->not->toBe('an old error')
         ->and($message->last_error)->toContain('the ledger rejected evt_1');
+});
+
+it('replays every failed message, past the first chunk', function () {
+    Queue::fake();
+
+    $rows = [];
+
+    for ($i = 1; $i <= 1001; $i++) {
+        $rows[] = [
+            'provider' => 'acme',
+            'event_id' => "evt_{$i}",
+            'event_type' => 'invoice.paid',
+            'data' => '{}',
+            'occurred_at' => now(),
+            'failed_at' => now(),
+            'last_error' => 'an old error',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+
+    DB::table('switchboard_inbox_messages')->insert($rows);
+
+    $this->artisan('switchboard:replay')->expectsOutputToContain('1001')->assertSuccessful();
+
+    Queue::assertCount(1001);
+
+    expect(InboxMessage::query()->failed()->count())->toBe(0);
+});
+
+it('leaves a message failed when it cannot be queued', function () {
+    config(['queue.default' => 'database']);
+
+    // The outage that produced the backlog has not finished yet.
+    Schema::drop('jobs');
+
+    $message = failedMessage('acme', 'evt_1');
+
+    expect(fn() => $this->artisan('switchboard:replay')->run())->toThrow(Exception::class);
+
+    expect($message->refresh()->isFailed())->toBeTrue()
+        ->and($message->last_error)->toBe('an old error');
+});
+
+it('refuses a --provider given without a value', function () {
+    Queue::fake();
+
+    failedMessage('acme', 'evt_1');
+
+    $this->artisan('switchboard:replay', ['--provider' => ''])->assertFailed();
+
+    Queue::assertCount(0);
+
+    expect(InboxMessage::query()->failed()->count())->toBe(1);
 });

@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Rooberthh\Switchboard\Contracts\Driver;
+use Rooberthh\Switchboard\Exceptions\InvalidInboxMessage;
 use Rooberthh\Switchboard\Inbox\InboxMessageData;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Switchboard;
@@ -205,4 +206,30 @@ it('writes before it reads, so a racing delivery cannot slip in between', functi
 
     expect($queries)->not->toBeEmpty()
         ->and($queries[0])->toStartWith('insert into');
+});
+
+it('refuses a driver that supplies a blank event id rather than collapsing the dedupe key', function () {
+    Switchboard::extend('acme', new class implements Driver {
+        public function verify(Request $request): bool
+        {
+            return true;
+        }
+
+        public function normalize(Request $request): InboxMessageData
+        {
+            // The header this driver reads its id from is not being sent.
+            return new InboxMessageData(eventId: '', eventType: 'invoice.paid');
+        }
+    });
+
+    $this->withoutExceptionHandling();
+
+    expect(fn() => deliver())->toThrow(InvalidInboxMessage::class);
+
+    expect(InboxMessage::query()->count())->toBe(0);
+});
+
+it('refuses a driver that supplies a blank event type', function () {
+    expect(fn() => new InboxMessageData(eventId: 'evt_1', eventType: ' '))
+        ->toThrow(InvalidInboxMessage::class);
 });

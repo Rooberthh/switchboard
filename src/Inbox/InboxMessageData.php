@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard\Inbox;
 
 use DateTimeInterface;
+use Rooberthh\Switchboard\Exceptions\InvalidInboxMessage;
 
 /**
  * What a driver read out of a request: the fields an inbox message is made of.
@@ -28,5 +29,16 @@ final readonly class InboxMessageData
         public array $data = [],
         public ?string $subject = null,
         public ?DateTimeInterface $occurredAt = null,
-    ) {}
+    ) {
+        // Guarded here rather than at the database, where a blank event id
+        // would not violate the unique index — it would quietly match the
+        // last event that had one.
+        if (trim($eventId) === '') {
+            throw InvalidInboxMessage::blankEventId();
+        }
+
+        if (trim($eventType) === '') {
+            throw InvalidInboxMessage::blankEventType();
+        }
+    }
 }

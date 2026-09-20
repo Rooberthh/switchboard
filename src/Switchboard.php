@@ -25,9 +25,6 @@ final class Switchboard
     /** @var array<string, Driver|Closure(): Driver|class-string<Driver>> */
     private static array $drivers = [];
 
-    /** @var array<string, Driver> */
-    private static array $resolved = [];
-
     /** @var array<string, Handler|Closure(): Handler|class-string<Handler>> */
     private static array $handlers = [];
 
@@ -40,8 +37,6 @@ final class Switchboard
     public static function extend(string $provider, Driver|Closure|string $driver): void
     {
         self::$drivers[$provider] = $driver;
-
-        unset(self::$resolved[$provider]);
     }
 
     public static function hasDriver(string $provider): bool
@@ -50,22 +45,23 @@ final class Switchboard
     }
 
     /**
+     * Resolved per request rather than cached, so a driver registered as a
+     * class name may depend on request- or tenant-scoped state even in a
+     * long-lived worker.
+     *
+     * @param  string  $provider
+     *
      * @throws UnknownProvider
-     * @param string $provider
      */
     public static function driver(string $provider): Driver
     {
-        if (isset(self::$resolved[$provider])) {
-            return self::$resolved[$provider];
-        }
-
         if (! isset(self::$drivers[$provider])) {
             throw UnknownProvider::for($provider);
         }
 
         $driver = self::$drivers[$provider];
 
-        return self::$resolved[$provider] = match (true) {
+        return match (true) {
             $driver instanceof Driver => $driver,
             $driver instanceof Closure => $driver(),
             default => app($driver),
@@ -153,7 +149,6 @@ final class Switchboard
     public static function flush(): void
     {
         self::$drivers = [];
-        self::$resolved = [];
         self::$handlers = [];
     }
 }

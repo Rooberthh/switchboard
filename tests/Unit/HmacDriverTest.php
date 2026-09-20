@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Rooberthh\Switchboard\Drivers\HmacDriver;
+use Rooberthh\Switchboard\Exceptions\InvalidProviderSecret;
+use Rooberthh\Switchboard\Switchboard;
 use Rooberthh\Switchboard\Drivers\StandardWebhooksDriver;
 use Rooberthh\Switchboard\Tests\Fixtures\AcmeHexDriver;
 use Rooberthh\Switchboard\Tests\Fixtures\AcmeStandardWebhooksDriver;
@@ -213,4 +215,22 @@ it("carries the readme's stripe recipe", function () {
         ->and($data->eventType)->toBe('invoice.paid')
         ->and($data->subject)->toBe('cus_12345')
         ->and($data->occurredAt?->getTimestamp())->toBe(Vector::TIMESTAMP);
+});
+
+it('refuses to fail silently on a secret it cannot decode', function () {
+    // Standard Webhooks secrets are base64. A raw one would otherwise reject
+    // every delivery forever, with nothing in the log to say why.
+    config(['switchboard.providers.acme.secret' => 'whsec_a raw secret, not base64']);
+
+    expect(fn() => (new AcmeStandardWebhooksDriver())->verify(vectorRequest()))
+        ->toThrow(InvalidProviderSecret::class, 'acme');
+});
+
+it('answers an unverifiable request with the same 400 when the secret is unusable', function () {
+    config(['switchboard.providers.acme.secret' => 'whsec_a raw secret, not base64']);
+
+    Switchboard::extend('acme', new AcmeStandardWebhooksDriver());
+    Switchboard::route('acme');
+
+    test()->postJson('webhooks/acme', ['type' => 'invoice.paid'])->assertStatus(400);
 });

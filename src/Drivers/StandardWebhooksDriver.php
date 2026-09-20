@@ -6,6 +6,7 @@ namespace Rooberthh\Switchboard\Drivers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Rooberthh\Switchboard\Exceptions\InvalidProviderSecret;
 
 /**
  * A base class for providers that sign with Standard Webhooks: webhook-id,
@@ -67,9 +68,19 @@ abstract class StandardWebhooksDriver extends HmacDriver
 
     protected function signingKey(): string
     {
-        $secret = Str::after($this->secret(), 'whsec_');
+        $secret = $this->secret();
 
-        return base64_decode($secret, true) ?: '';
+        if ($secret === '') {
+            return '';
+        }
+
+        $key = base64_decode(Str::after($secret, 'whsec_'), true);
+
+        if ($key === false) {
+            throw InvalidProviderSecret::notBase64($this->provider());
+        }
+
+        return $key;
     }
 
     protected function encode(string $digest): string

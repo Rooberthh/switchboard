@@ -85,3 +85,18 @@ it('names the route after the provider so applications can generate its url', fu
 it('ships no facade', function () {
     expect(class_exists('Rooberthh\\Switchboard\\Facades\\Switchboard'))->toBeFalse();
 });
+
+it('resolves a driver for each request rather than holding one for the life of the worker', function () {
+    $resolved = 0;
+
+    Switchboard::extend('acme', function () use (&$resolved) {
+        $resolved++;
+
+        return new FakeDriver();
+    });
+
+    Switchboard::driver('acme');
+    Switchboard::driver('acme');
+
+    expect($resolved)->toBe(2);
+});

@@ -122,6 +122,10 @@ public function boot(): void
 ],
 ```
 
+Standard Webhooks secrets are base64, usually written with a `whsec_` prefix.
+A secret that is not valid base64 throws rather than quietly rejecting every
+delivery.
+
 Point the provider at `https://your-app.test/webhooks/acme` and run a queue
 worker. A delivery is now verified, stored, answered with `204`, and handled on
 the queue.
@@ -263,6 +267,14 @@ It returns the `Route`, so you can decorate it like any other. Registering a
 route for a provider with no driver throws **at registration time** and names the
 key — a typo fails when your application boots, not by losing a live webhook.
 
+The endpoint is public and unauthenticated by definition, so give it a rate
+limit in production. Switchboard does not impose one, because the right limit
+depends on the provider's delivery volume:
+
+```php
+Switchboard::route('stripe', middleware: ['throttle:120,1']);
+```
+
 What a provider sees:
 
 | Response | When |
@@ -391,6 +403,10 @@ static `Switchboard` class.
 | `inbox.tries` | Attempts a handler gets before the message is recorded as failed. |
 | `inbox.backoff` | Seconds between attempts. Exponential by default. |
 | `providers.{key}.secret` | The conventional place a driver reads its secret from. Switchboard itself never reads it. |
+
+Configuration mistakes are loud rather than quiet: a secret that cannot be
+decoded, or a driver that supplies a blank event id, throws instead of turning
+into an endpoint that rejects — or silently discards — every delivery.
 
 ## Public API and compatibility
 
