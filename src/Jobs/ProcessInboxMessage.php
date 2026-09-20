@@ -9,6 +9,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Str;
+use Rooberthh\Switchboard\Events\InboxMessageFailed;
+use Rooberthh\Switchboard\Events\InboxMessageProcessed;
 use Rooberthh\Switchboard\Inbox\InboxMessages;
 use Rooberthh\Switchboard\Switchboard;
 use Throwable;
@@ -56,6 +58,8 @@ final class ProcessInboxMessage implements ShouldQueue
         Switchboard::handler($message->provider)->handle($message);
 
         $message->forceFill(['processed_at' => now()])->save();
+
+        event(new InboxMessageProcessed($message));
     }
 
     /**
@@ -75,6 +79,8 @@ final class ProcessInboxMessage implements ShouldQueue
             'failed_at' => now(),
             'last_error' => self::describe($exception),
         ])->save();
+
+        event(new InboxMessageFailed($message, $exception));
     }
 
     /**

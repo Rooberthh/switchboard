@@ -249,6 +249,36 @@ Processing runs on your default queue connection unless you say otherwise:
 ],
 ```
 
+## Lifecycle events
+
+Three events let you watch the parts of the inbox you do not own. They are
+observation points — metrics, alerting, notification — and never a way to
+replace the handler:
+
+| Event | Fired when |
+| --- | --- |
+| `InboxMessageReceived` | A message has been verified and persisted. Dispatched *after commit*, so a listener never sees a message that was rolled back. |
+| `InboxMessageProcessed` | A handler returned successfully. |
+| `InboxMessageFailed` | The attempts are spent and `failed_at` is set. This is the one to alert on. |
+
+Each carries the message; `InboxMessageFailed` also carries the exception.
+
+```php
+use Rooberthh\Switchboard\Events\InboxMessageFailed;
+
+Event::listen(function (InboxMessageFailed $event) {
+    Log::critical('A webhook gave up.', [
+        'provider' => $event->message->provider,
+        'event_id' => $event->message->event_id,
+        'error' => $event->message->last_error,
+    ]);
+
+    OpsChannel::alert($event->exception);
+});
+```
+
+Listening to none of them changes nothing.
+
 ## Outbox
 
 Emitting webhooks — a transactional `emit()`, endpoints, deliveries, signed

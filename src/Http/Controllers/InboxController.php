@@ -6,6 +6,7 @@ namespace Rooberthh\Switchboard\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Rooberthh\Switchboard\Events\InboxMessageReceived;
 use Rooberthh\Switchboard\Inbox\InboxMessages;
 use Rooberthh\Switchboard\Jobs\ProcessInboxMessage;
 use Rooberthh\Switchboard\Switchboard;
@@ -57,8 +58,11 @@ final class InboxController
         );
 
         if ($message->wasRecentlyCreated) {
-            // After commit, so a message that is rolled back is never worked on.
+            // Both after commit, so nothing acts on a message that the
+            // surrounding transaction then rolled back.
             ProcessInboxMessage::dispatch($message->id)->afterCommit();
+
+            event(new InboxMessageReceived($message));
         }
 
         return response()->noContent();
