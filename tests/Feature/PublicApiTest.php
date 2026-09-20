@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Support\Facades\File;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Illuminate\Support\Collection;
@@ -87,4 +88,19 @@ it('ships an abstract base class beside every contract', function () {
 
 it('leaves the inbox message model open for an application to extend', function () {
     expect((new ReflectionClass(InboxMessage::class))->isFinal())->toBeFalse();
+});
+
+it('holds every event until the surrounding transaction commits', function () {
+    // Nothing may act on a message that the transaction then rolled back, and
+    // an event added later must not be able to forget that quietly.
+    $events = packageClasses()->filter(
+        fn(string $class): bool => str_starts_with($class, 'Rooberthh\\Switchboard\\Events\\'),
+    );
+
+    expect($events)->not->toBeEmpty();
+
+    foreach ($events as $event) {
+        expect((new ReflectionClass($event))->implementsInterface(ShouldDispatchAfterCommit::class))
+            ->toBeTrue("{$event} must implement ShouldDispatchAfterCommit");
+    }
 });
