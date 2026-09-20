@@ -279,6 +279,42 @@ Event::listen(function (InboxMessageFailed $event) {
 
 Listening to none of them changes nothing.
 
+## Operating the inbox
+
+### What state is a message in?
+
+Lifecycle is timestamps, not a status column. A message with neither
+`processed_at` nor `failed_at` is **unprocessed** — including one a worker is
+handling right now, because there is no in-flight state:
+
+```php
+InboxMessage::query()->processed()->count();
+InboxMessage::query()->failed()->forProvider('stripe')->get();
+InboxMessage::query()->unprocessed()->where('created_at', '<', now()->subHour())->get();
+```
+
+`last_error` holds the exception that ended the last attempt, so a failure can
+be diagnosed without reproducing it.
+
+### Replay
+
+When a bug or an outage in your own code has left messages failed, replay
+re-runs them. You do not have to ask the provider to resend anything:
+
+```bash
+php artisan switchboard:replay
+php artisan switchboard:replay --provider=stripe
+```
+
+Replay clears `failed_at` and `last_error` and re-dispatches processing, so the
+messages go back to unprocessed and a second run finds nothing. Only failed
+messages are eligible — re-running one that succeeded would repeat side effects
+your application has already performed.
+
+Replay means **re-run, not re-verify**. An inbox message is a normalized record
+rather than a capture of the request, so a stored message's signature can never
+be recomputed. Verification happened once, at the edge.
+
 ## Outbox
 
 Emitting webhooks — a transactional `emit()`, endpoints, deliveries, signed
