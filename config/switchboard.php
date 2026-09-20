@@ -53,6 +53,12 @@ return [
     | handler gets before the message is recorded as failed, and how many
     | seconds to wait between them.
     |
+    | "stale_after" is how many seconds a message may sit unprocessed before
+    | switchboard:relay treats its job as lost and queues it again. Null
+    | derives a window from "tries", "backoff" and your queue connection's
+    | retry_after, which is what you want unless a handler of yours runs for
+    | longer than that.
+    |
     */
 
     'inbox' => [
@@ -60,6 +66,7 @@ return [
         'tolerance' => (int) env('SWITCHBOARD_INBOX_TOLERANCE', 300),
         'tries' => 5,
         'backoff' => [10, 60, 360, 2160],
+        'stale_after' => null,
     ],
 
     /*

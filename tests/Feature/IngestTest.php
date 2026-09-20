@@ -157,6 +157,7 @@ it('stores neither the raw body nor the request headers', function () {
         'processed_at',
         'failed_at',
         'last_error',
+        'relayed_at',
         'created_at',
         'updated_at',
     ]);
