@@ -11,10 +11,10 @@ use Rooberthh\Switchboard\Models\InboxMessage;
 /**
  * The class an integration extends: one per provider.
  *
- * A subclass names the provider, returns its verification, normalizes its
- * requests and maps event types to handlers. This class supplies the rest:
- * where the secret is read from, and what happens to an event type nobody
- * wrote a handler for.
+ * A subclass names the provider, returns its verification, turns its requests
+ * into inbox messages and maps event types to handlers. This class supplies
+ * the rest: where the secret is read from, and what happens to an event type
+ * nobody wrote a handler for.
  *
  * Generate one with `php artisan make:webhook-provider`, and register it with
  * Switchboard::provider() in a service provider's boot method.

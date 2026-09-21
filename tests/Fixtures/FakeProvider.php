@@ -11,7 +11,7 @@ use Rooberthh\Switchboard\Inbox\InboxMessageData;
 use Rooberthh\Switchboard\Inbox\WebhookProvider;
 
 /**
- * A provider that verifies everything and reads the normalized fields straight
+ * A provider that verifies everything and reads the message's fields straight
  * off the JSON body. Tests change one part by extending it anonymously.
  */
 class FakeProvider extends WebhookProvider
@@ -30,7 +30,7 @@ class FakeProvider extends WebhookProvider
         return new FakeVerification();
     }
 
-    public function normalize(Request $request): InboxMessageData
+    public function toInboxMessageData(Request $request): InboxMessageData
     {
         /** @var array<string, mixed> $payload */
         $payload = $request->json()->all();

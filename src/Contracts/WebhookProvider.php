@@ -48,11 +48,12 @@ interface WebhookProvider
     public function verification(): Verification;
 
     /**
-     * What a verified request means. Only called for a request that verified.
+     * The inbox message a request carries: what it means, not how it arrived.
+     * Pass provider: static::name(). Only called for a request that verified.
      *
      * @param Request $request
      */
-    public function normalize(Request $request): InboxMessageData;
+    public function toInboxMessageData(Request $request): InboxMessageData;
 
     /**
      * What to do with a message whose event type has no handler.

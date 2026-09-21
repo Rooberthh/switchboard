@@ -101,7 +101,7 @@ it('deduplicates by recovering from the unique index, not by reading before writ
     // A racing delivery of the same event commits between verification and our
     // own insert. Only insert-first-and-recover survives this.
     replaceProvider(new class extends FakeProvider {
-        public function normalize(Request $request): InboxMessageData
+        public function toInboxMessageData(Request $request): InboxMessageData
         {
             DB::table('switchboard_inbox_messages')->insert([
                 'provider' => 'acme',
@@ -221,7 +221,7 @@ it('writes before it reads, so a racing delivery cannot slip in between', functi
 
 it('refuses a provider that supplies a blank event id rather than collapsing the dedupe key', function () {
     replaceProvider(new class extends FakeProvider {
-        public function normalize(Request $request): InboxMessageData
+        public function toInboxMessageData(Request $request): InboxMessageData
         {
             // The header this provider reads its id from is not being sent.
             return new InboxMessageData(provider: 'acme', eventId: '', eventType: 'invoice.paid');
@@ -247,7 +247,7 @@ it('refuses a blank provider', function () {
 
 it('refuses a provider that files a message under another provider, and persists nothing', function () {
     replaceProvider(new class extends FakeProvider {
-        public function normalize(Request $request): InboxMessageData
+        public function toInboxMessageData(Request $request): InboxMessageData
         {
             return new InboxMessageData(provider: 'stripe', eventId: 'evt_1', eventType: 'invoice.paid');
         }

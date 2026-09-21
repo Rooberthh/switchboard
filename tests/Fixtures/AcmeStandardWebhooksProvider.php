@@ -25,7 +25,7 @@ class AcmeStandardWebhooksProvider extends WebhookProvider
         return new StandardWebhooks($this->secret());
     }
 
-    public function normalize(Request $request): InboxMessageData
+    public function toInboxMessageData(Request $request): InboxMessageData
     {
         $payload = $request->json()->all();
 

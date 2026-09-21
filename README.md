@@ -81,7 +81,7 @@ final class AcmeProvider extends WebhookProvider
         return new StandardWebhooks($this->secret());
     }
 
-    public function normalize(Request $request): InboxMessageData
+    public function toInboxMessageData(Request $request): InboxMessageData
     {
         $payload = $request->json()->all();
 
@@ -149,7 +149,7 @@ A provider class is the whole of an integration. Everything it has to say:
 | --- | --- |
 | `name()` | The provider's name: stored on every message, the route segment and the secret's config key. Static, and keep it stable — stored messages are found by it. |
 | `verification()` | How its requests are proven authentic. Switchboard calls it; the provider never verifies a request itself. |
-| `normalize()` | What a verified request means. Pass `provider: static::name()`; a message filed under any other name is refused. |
+| `toInboxMessageData()` | What a verified request means, as the inbox message to store. Pass `provider: static::name()`; a message filed under any other name is refused. |
 | `$handlers` | Event type to invokable handler class. |
 | `unhandled()` | What happens to an event type with no handler. Logs a warning by default. |
 | `secret()` | Where the secret comes from. `config('switchboard.providers.{name}.secret')` by default. |
@@ -250,7 +250,7 @@ final class StripeProvider extends WebhookProvider
         return new StripeVerification($this->secret());
     }
 
-    public function normalize(Request $request): InboxMessageData
+    public function toInboxMessageData(Request $request): InboxMessageData
     {
         $payload = $request->json()->all();
 
