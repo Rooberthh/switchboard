@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Queue;
-use Rooberthh\Switchboard\Contracts\Driver;
-use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\Contracts\Verification;
+use Rooberthh\Switchboard\Exceptions\InvalidProviderSecret;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Switchboard;
-use Rooberthh\Switchboard\Tests\Fixtures\AcmeStandardWebhooksDriver;
+use Rooberthh\Switchboard\Tests\Fixtures\AcmeStandardWebhooksProvider;
 use Rooberthh\Switchboard\Tests\Fixtures\StandardWebhooksVector as Vector;
 use Illuminate\Testing\TestResponse;
 
@@ -21,8 +22,7 @@ beforeEach(function () {
 
     Carbon::setTestNow(Carbon::createFromTimestamp(Vector::TIMESTAMP));
 
-    Switchboard::extend('acme', new AcmeStandardWebhooksDriver());
-    Switchboard::route('acme');
+    Switchboard::provider(AcmeStandardWebhooksProvider::class);
 });
 
 afterEach(function () {
@@ -113,22 +113,36 @@ it('tells an attacker nothing about which part of the forgery was wrong', functi
         ->and($responses->first()['content'])->toBe('');
 });
 
-it('works with a driver that ignores the base class entirely', function () {
-    Switchboard::extend('acme', new class implements Driver {
-        public function verify(Request $request): bool
-        {
-            // Whatever the application decides authentic means.
-            return $request->header('x-shared-token') === 'let me in';
-        }
+it('verifies with whatever verification the provider returns', function () {
+    Switchboard::flush();
 
-        public function normalize(Request $request): InboxMessageData
+    Switchboard::provider((new class extends AcmeStandardWebhooksProvider {
+        public function verification(): Verification
         {
-            return new InboxMessageData(provider: 'acme', eventId: 'evt_1', eventType: 'invoice.paid');
+            return new class implements Verification {
+                public function verify(Request $request): bool
+                {
+                    // Whatever the application decides authentic means.
+                    return $request->header('x-shared-token') === 'let me in';
+                }
+            };
         }
-    });
+    })::class);
 
-    post(['x-shared-token' => 'let me in'], '{}')->assertNoContent();
-    post(['x-shared-token' => 'wrong'], '{}')->assertStatus(400);
+    post(['x-shared-token' => 'let me in', 'webhook-id' => 'evt_1'], '{}')->assertNoContent();
+    post(['x-shared-token' => 'wrong', 'webhook-id' => 'evt_2'], '{}')->assertStatus(400);
 
     expect(InboxMessage::query()->count())->toBe(1);
+});
+
+it('answers with the same 400, and reports it, when the secret is unusable', function () {
+    Exceptions::fake();
+
+    config(['switchboard.providers.acme.secret' => 'whsec_a raw secret, not base64']);
+
+    post(Vector::headers('{}'), '{}')->assertStatus(400);
+
+    Exceptions::assertReported(InvalidProviderSecret::class);
+
+    expect(InboxMessage::query()->count())->toBe(0);
 });

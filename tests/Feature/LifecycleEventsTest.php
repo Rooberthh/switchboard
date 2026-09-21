@@ -9,13 +9,14 @@ use Rooberthh\Switchboard\Events\InboxMessageProcessed;
 use Rooberthh\Switchboard\Events\InboxMessageReceived;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Switchboard;
-use Rooberthh\Switchboard\Tests\Fixtures\AcmeHandler;
-use Rooberthh\Switchboard\Tests\Fixtures\FakeDriver;
+use Rooberthh\Switchboard\Tests\Fixtures\FakeProvider;
+use Rooberthh\Switchboard\Tests\Fixtures\RecordingHandler;
 use Rooberthh\Switchboard\Tests\Fixtures\ThrowingHandler;
+use Rooberthh\Switchboard\Tests\Fixtures\ThrowingProvider;
 use Illuminate\Testing\TestResponse;
 
 beforeEach(function () {
-    AcmeHandler::$calls = [];
+    RecordingHandler::$calls = [];
     ThrowingHandler::$attempts = 0;
     ThrowingHandler::$succeedFrom = [];
 
@@ -25,9 +26,7 @@ beforeEach(function () {
         'switchboard.inbox.backoff' => [0],
     ]);
 
-    Switchboard::extend('acme', new FakeDriver());
-    Switchboard::handledBy('acme', AcmeHandler::class);
-    Switchboard::route('acme');
+    Switchboard::provider(FakeProvider::class);
 });
 
 function arrive(string $id = 'evt_1'): TestResponse
@@ -109,7 +108,8 @@ it('fires an event when a handler processes a message', function () {
 });
 
 it('fires an event when a message has failed for good', function () {
-    Switchboard::handledBy('acme', ThrowingHandler::class);
+    Switchboard::flush();
+    Switchboard::provider(ThrowingProvider::class);
 
     Event::fake([InboxMessageFailed::class]);
 
@@ -127,7 +127,8 @@ it('fires an event when a message has failed for good', function () {
 });
 
 it('does not fire the failed event while retries remain', function () {
-    Switchboard::handledBy('acme', ThrowingHandler::class);
+    Switchboard::flush();
+    Switchboard::provider(ThrowingProvider::class);
 
     config(['switchboard.inbox.tries' => 5]);
 
@@ -146,5 +147,5 @@ it('leaves an application that listens to none of them unaffected', function () 
     drain();
 
     expect(InboxMessage::query()->sole()->isProcessed())->toBeTrue()
-        ->and(AcmeHandler::$calls)->toBe(['invoicePaid:evt_1']);
+        ->and(RecordingHandler::$calls)->toBe(['invoice.paid:evt_1']);
 });

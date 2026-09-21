@@ -6,23 +6,28 @@ namespace Rooberthh\Switchboard\Tests\Fixtures;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Rooberthh\Switchboard\Contracts\Driver;
+use Rooberthh\Switchboard\Contracts\Verification;
 use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\Inbox\WebhookProvider;
 
 /**
- * A driver whose verification is controlled by the test, and which reads the
- * normalized fields straight off the JSON body.
+ * A provider that verifies everything and reads the normalized fields straight
+ * off the JSON body. Tests change one part by extending it anonymously.
  */
-class FakeDriver implements Driver
+class FakeProvider extends WebhookProvider
 {
-    public function __construct(
-        private readonly bool $verifies = true,
-        private readonly string $provider = 'acme',
-    ) {}
+    public array $handlers = [
+        'invoice.paid' => RecordingHandler::class,
+    ];
 
-    public function verify(Request $request): bool
+    public static function name(): string
     {
-        return $this->verifies;
+        return 'acme';
+    }
+
+    public function verification(): Verification
+    {
+        return new FakeVerification();
     }
 
     public function normalize(Request $request): InboxMessageData
@@ -31,7 +36,7 @@ class FakeDriver implements Driver
         $payload = $request->json()->all();
 
         return new InboxMessageData(
-            provider: $this->provider,
+            provider: static::name(),
             eventId: (string) $payload['id'],
             eventType: (string) $payload['type'],
             data: is_array($payload['data'] ?? null) ? $payload['data'] : [],

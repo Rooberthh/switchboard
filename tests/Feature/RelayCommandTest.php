@@ -8,17 +8,15 @@ use Illuminate\Support\Facades\Schema;
 use Rooberthh\Switchboard\Inbox\Staleness;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Switchboard;
-use Rooberthh\Switchboard\Tests\Fixtures\AcmeHandler;
-use Rooberthh\Switchboard\Tests\Fixtures\FakeDriver;
+use Rooberthh\Switchboard\Tests\Fixtures\FakeProvider;
+use Rooberthh\Switchboard\Tests\Fixtures\OtherFakeProvider;
+use Rooberthh\Switchboard\Tests\Fixtures\RecordingHandler;
 
 beforeEach(function () {
-    AcmeHandler::$calls = [];
+    RecordingHandler::$calls = [];
 
-    Switchboard::extend('acme', new FakeDriver());
-    Switchboard::extend('other', new FakeDriver(provider: 'other'));
-    Switchboard::handledBy('acme', AcmeHandler::class);
-    Switchboard::handledBy('other', AcmeHandler::class);
-    Switchboard::route('acme');
+    Switchboard::provider(FakeProvider::class);
+    Switchboard::provider(OtherFakeProvider::class);
 });
 
 function stranded(string $provider = 'acme', string $eventId = 'evt_1', array $lifecycle = []): InboxMessage
@@ -205,7 +203,7 @@ it('recovers a message whose job never reached the queue', function () {
     $this->postJson('webhooks/acme', ['id' => 'evt_1', 'type' => 'invoice.paid', 'data' => ['amount' => 1000]])
         ->assertNoContent();
 
-    expect(AcmeHandler::$calls)->toBe([]);
+    expect(RecordingHandler::$calls)->toBe([]);
 
     // The queue comes back, still holding nothing for this message.
     Queue::swap($queue);
@@ -218,5 +216,5 @@ it('recovers a message whose job never reached the queue', function () {
     $this->artisan('queue:work', ['--stop-when-empty' => true, '--sleep' => 0])->run();
 
     expect(InboxMessage::query()->sole()->refresh()->isProcessed())->toBeTrue()
-        ->and(AcmeHandler::$calls)->toBe(['invoicePaid:evt_1']);
+        ->and(RecordingHandler::$calls)->toBe(['invoice.paid:evt_1']);
 });

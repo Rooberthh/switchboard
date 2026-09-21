@@ -13,7 +13,8 @@ use Throwable;
 
 /**
  * Verify, normalize, persist, respond. Holds no provider knowledge and no
- * secret, and does no work the provider has to wait for.
+ * secret — the registered provider class supplies both — and does no work the
+ * provider has to wait for.
  *
  * @internal
  */
@@ -21,15 +22,16 @@ final class InboxController
 {
     public function __invoke(Request $request, string $provider): Response
     {
-        $driver = Switchboard::driver($provider);
+        $webhookProvider = Switchboard::resolve($provider);
 
         try {
-            $verified = $driver->verify($request);
+            $verified = $webhookProvider->verification()->verify($request);
         } catch (Throwable $e) {
-            // A driver that throws on a malformed request has told us the same
-            // thing as a driver that returned false, so answer the same way.
-            // Reported, because it is far more likely to be a driver bug than
-            // a forgery.
+            // A verification that throws on a malformed request, or one the
+            // provider could not even build, has told us the same thing as
+            // one that returned false, so answer the same way. Reported,
+            // because it is far more likely to be a bug or a misconfiguration
+            // than a forgery.
             report($e);
 
             $verified = false;
@@ -41,14 +43,14 @@ final class InboxController
             return response()->noContent(Response::HTTP_BAD_REQUEST);
         }
 
-        $data = $driver->normalize($request);
+        $data = $webhookProvider->normalize($request);
 
-        // The route's key is what the driver was registered under, and so the
-        // only provider this request can be for. Disagreeing is a driver bug,
-        // not a forgery — it has already verified — so it throws and is
-        // reported rather than answering the provider with a rejection.
-        if ($data->provider !== $provider) {
-            throw InvalidInboxMessage::providerMismatch($provider, $data->provider);
+        // The name is what stored messages are found by, so a provider may
+        // only file messages under its own. Disagreeing is a bug in the
+        // provider, not a forgery — the request has already verified — so it
+        // throws and is reported rather than answering with a rejection.
+        if ($data->provider !== $webhookProvider::name()) {
+            throw InvalidInboxMessage::providerMismatch($webhookProvider::name(), $data->provider);
         }
 
         app(CreateInboxMessageAction::class)->execute($data);

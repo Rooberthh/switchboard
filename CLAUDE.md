@@ -14,14 +14,15 @@ composer stan          # PHPStan level 8 via Larastan
 composer pint          # Pint, preset "per" (pint.json)
 ```
 
-Supported: PHP ^8.3, Laravel 13 only.
+Supported: PHP ^8.4, Laravel 13 only.
 
 ## Thesis
 
 - Inbox and outbox mirror each other: persist first, then work on the queue. Messages are idempotent by event ID.
 - Lifecycle is timestamps, not an enum: `processed_at`, `failed_at`, `last_error`. There is no in-flight state, so a message being worked on right now is still **unprocessed**.
 - An inbox message is a normalized record, not a capture of the request: no raw body, no headers. Replay therefore means re-run, never re-verify. See ADR-0003.
-- Verification is delegated to an application-supplied driver. The package ships an HMAC base class but **never holds a secret** and ships no provider drivers. See ADR-0001.
+- An integration is **one provider class** (`Inbox\WebhookProvider`): name, verification, normalization and the event-type → handler map. See ADR-0005.
+- Verification is delegated to the `Verification` class a provider returns. The package ships `StandardWebhooks` but **never holds a secret** and ships no provider classes. See ADR-0001.
 - Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature`, signing `id.timestamp.body`, base64) is the outbox's signing scheme, and is available inbound to any driver that wants it.
 - The outbox is a **transactional outbox**. `emit()` writes rows inside the caller's DB transaction, jobs dispatch `afterCommit`, and a relay sweeper gives at-least-once delivery.
 
@@ -30,7 +31,7 @@ Supported: PHP ^8.3, Laravel 13 only.
 The package works with zero config, and anything a platform needs to make its own is swappable. There is one rule for *how*:
 
 - **Config** holds data only: table names, queues, timeouts, tolerances.
-- **The static `Switchboard` class** holds behavior, configured from a service provider's `boot()`: `Switchboard::extend()`, `Switchboard::route()`, and later the `use*Model()` configurators. This follows Cashier/Passport. **There is no facade.**
+- **Provider classes** hold behavior. **The static `Switchboard` class** is where they are registered, from a service provider's `boot()`: `Switchboard::provider(AcmeProvider::class)`, and later the `use*Model()` configurators. This follows Cashier/Passport. **There is no facade.** Never register from a route file: those do not run under `route:cache`.
 - **Contracts** are bound in the container.
 - **Events** let apps react, not replace.
 
@@ -38,7 +39,7 @@ Add a seam only for a real integration need, never for internal layering.
 
 ## BC rules
 
-- Every contract is public API. Keep contracts to 1–3 methods and ship an abstract base class next to each one. Adding a method to an interface is a breaking change.
+- Every contract is public API. Keep contracts to 1–3 methods and ship a base class or implementation next to each one. Adding a method to an interface is a breaking change. The one deliberate exception is `Contracts\WebhookProvider` (ADR-0005).
 - Internals (jobs, middleware, controllers, relay) are `final` and `@internal`. Users swap behavior through a seam, never by subclassing internals.
 - Every extension point gets a test that swaps it and a README recipe.
 

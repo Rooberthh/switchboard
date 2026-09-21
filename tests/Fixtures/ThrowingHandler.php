@@ -4,23 +4,17 @@ declare(strict_types=1);
 
 namespace Rooberthh\Switchboard\Tests\Fixtures;
 
-use Rooberthh\Switchboard\Inbox\Handler;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use RuntimeException;
 
-class ThrowingHandler extends Handler
+final class ThrowingHandler
 {
     public static int $attempts = 0;
 
     /** @var list<string> */
     public static array $succeedFrom = [];
 
-    protected function methodFor(InboxMessage $message): ?string
-    {
-        return 'always';
-    }
-
-    public function always(InboxMessage $message): void
+    public function __invoke(InboxMessage $message): void
     {
         self::$attempts++;
 

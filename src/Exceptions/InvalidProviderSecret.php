@@ -13,10 +13,10 @@ use RuntimeException;
  */
 final class InvalidProviderSecret extends RuntimeException
 {
-    public static function notBase64(string $provider): self
+    public static function notBase64(): self
     {
         return new self(
-            "The Switchboard secret configured for the provider [{$provider}] is not valid base64. "
+            'The Standard Webhooks secret is not valid base64. '
             . 'Standard Webhooks secrets are base64, optionally prefixed with "whsec_".',
         );
     }

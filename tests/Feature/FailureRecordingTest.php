@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Switchboard;
-use Rooberthh\Switchboard\Tests\Fixtures\FakeDriver;
 use Rooberthh\Switchboard\Tests\Fixtures\ThrowingHandler;
+use Rooberthh\Switchboard\Tests\Fixtures\ThrowingProvider;
 use Illuminate\Testing\TestResponse;
 use Rooberthh\Switchboard\Jobs\ProcessInboxMessage;
 
@@ -21,9 +21,7 @@ beforeEach(function () {
         'switchboard.inbox.backoff' => [0],
     ]);
 
-    Switchboard::extend('acme', new FakeDriver());
-    Switchboard::handledBy('acme', ThrowingHandler::class);
-    Switchboard::route('acme');
+    Switchboard::provider(ThrowingProvider::class);
 });
 
 function deliverOne(string $id = 'evt_1'): TestResponse

@@ -5,9 +5,9 @@ An inbox and outbox for webhooks in Laravel.
 - **Inbox:** receive webhooks that are verified, deduplicated by event ID, stored, and processed on the queue. Anything that failed can be replayed.
 - **Outbox:** emit webhooks inside your own database transaction, signed with [Standard Webhooks](https://www.standardwebhooks.com/) and delivered with retries. *Arrives in 0.2.0.*
 
-Both directions share one message lifecycle and one signing scheme. Everything a
-platform needs to make its own — drivers, handlers, secrets, routing, queues — is
-an extension point.
+Both directions share one message lifecycle and one signing scheme. An
+integration is one provider class; everything a platform needs to make its own —
+verification, handlers, secrets, routing, queues — is an extension point.
 
 > **This release (0.1.0) is the inbox and a way to consume it.** The outbox
 > follows in 0.2.0.
@@ -31,7 +31,7 @@ the event ID, runs your code on the queue, and records what happened.
 
 ## Requirements
 
-- PHP 8.3+
+- PHP 8.4+
 - Laravel 13
 
 ## Installation
@@ -45,23 +45,40 @@ php artisan migrate
 
 ## Quickstart
 
-Three pieces: a **driver** that reads a provider, a **route** that exposes the
-endpoint, and a **handler** that acts on what arrives.
+A **provider** is one class. It names the provider, says how its requests are
+verified, reads what they mean, and maps event types to the handlers that act on
+them.
 
-**1. Write a driver.** It answers two questions: is this request authentic, and
-what does it mean.
+**1. Generate it.**
+
+```bash
+php artisan make:webhook-provider Acme
+```
+
+This writes `app/Webhooks/AcmeProvider.php`, ready for a provider that signs
+with [Standard Webhooks](https://www.standardwebhooks.com/):
 
 ```php
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
-use Rooberthh\Switchboard\Drivers\StandardWebhooksDriver;
+use Rooberthh\Switchboard\Contracts\Verification;
 use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\Inbox\WebhookProvider;
+use Rooberthh\Switchboard\Verification\StandardWebhooks;
 
-final class AcmeDriver extends StandardWebhooksDriver
+final class AcmeProvider extends WebhookProvider
 {
-    protected function provider(): string
+    public array $handlers = [
+        'invoice.paid' => MarkInvoicePaid::class,
+    ];
+
+    public static function name(): string
     {
         return 'acme';
+    }
+
+    public function verification(): Verification
+    {
+        return new StandardWebhooks($this->secret());
     }
 
     public function normalize(Request $request): InboxMessageData
@@ -69,52 +86,28 @@ final class AcmeDriver extends StandardWebhooksDriver
         $payload = $request->json()->all();
 
         return new InboxMessageData(
-            provider: $this->provider(),
+            provider: static::name(),
             eventId: (string) $request->header('webhook-id'),
             eventType: $payload['type'],
             data: $payload['data'],
             subject: $payload['data']['customer_id'] ?? null,
-            occurredAt: Carbon::parse($payload['timestamp']),
         );
     }
 }
 ```
 
-**2. Write a handler.** One method per event type.
-
-```php
-use Rooberthh\Switchboard\Inbox\Handler;
-use Rooberthh\Switchboard\Models\InboxMessage;
-
-final class AcmeHandler extends Handler
-{
-    protected array $handles = [
-        'invoice.paid' => 'invoicePaid',
-    ];
-
-    public function invoicePaid(InboxMessage $message): void
-    {
-        Invoice::query()
-            ->where('acme_id', $message->subject)
-            ->update(['paid_at' => $message->occurred_at]);
-    }
-}
-```
-
-**3. Wire them up** in a service provider's `boot()`:
+**2. Register it** in a service provider's `boot()`:
 
 ```php
 use Rooberthh\Switchboard\Switchboard;
 
 public function boot(): void
 {
-    Switchboard::extend('acme', AcmeDriver::class);
-    Switchboard::handledBy('acme', AcmeHandler::class);
-    Switchboard::route('acme'); // POST /webhooks/acme
+    Switchboard::provider(AcmeProvider::class); // POST /webhooks/acme
 }
 ```
 
-**4. Put the secret in config** — Switchboard never holds one itself:
+**3. Set its secret.** Switchboard never holds one itself:
 
 ```php
 // config/switchboard.php
@@ -127,54 +120,134 @@ Standard Webhooks secrets are base64, usually written with a `whsec_` prefix.
 A secret that is not valid base64 throws rather than quietly rejecting every
 delivery.
 
+**4. Write a handler** for each event type you care about. A handler is an
+invokable class, built by the container on the queue:
+
+```php
+use Rooberthh\Switchboard\Models\InboxMessage;
+
+final class MarkInvoicePaid
+{
+    public function __invoke(InboxMessage $message): void
+    {
+        Invoice::query()
+            ->where('acme_id', $message->subject)
+            ->update(['paid_at' => $message->occurred_at]);
+    }
+}
+```
+
 Point the provider at `https://your-app.test/webhooks/acme` and run a queue
 worker. A delivery is now verified, stored, answered with `204`, and handled on
 the queue.
 
-## Writing a driver
+## Writing a provider
 
-Switchboard ships **no provider drivers**, and this is deliberate. Shipping one
+A provider class is the whole of an integration. Everything it has to say:
+
+| Member | What it says |
+| --- | --- |
+| `name()` | The provider's name: stored on every message, the route segment and the secret's config key. Static, and keep it stable — stored messages are found by it. |
+| `verification()` | How its requests are proven authentic. Switchboard calls it; the provider never verifies a request itself. |
+| `normalize()` | What a verified request means. Pass `provider: static::name()`; a message filed under any other name is refused. |
+| `$handlers` | Event type to invokable handler class. |
+| `unhandled()` | What happens to an event type with no handler. Logs a warning by default. |
+| `secret()` | Where the secret comes from. `config('switchboard.providers.{name}.secret')` by default. |
+
+Switchboard ships **no provider classes**, and this is deliberate. Shipping one
 is a permanent obligation to track someone else's header format, signature
 scheme and event vocabulary, and getting it subtly wrong would be a security bug
-in *this* package rather than in your fifteen lines. What it ships instead is an
-HMAC base class that owns the parts that are the same everywhere and easy to get
-wrong: constant-time comparison, the symmetric timestamp window, and a
-conventional place to read a secret from.
+in *this* package rather than in your fifteen lines
+(`docs/adr/0001-no-shipped-provider-drivers.md`).
 
-### A driver for Stripe
+### Verification
+
+What it ships instead is the security-sensitive part. `StandardWebhooks` covers
+the `webhook-id` / `webhook-timestamp` / `webhook-signature` scheme: a
+constant-time comparison over the raw body, a symmetric timestamp window, and a
+refusal to trust any signature version but `v1`. It is verified against the
+Standard Webhooks reference vectors, including the ones that must *not* verify.
+It is a *scheme*, not a provider — this is also what Switchboard's own outbox
+will sign with.
+
+The tolerance defaults to `inbox.tolerance`. A provider that needs its own says
+so where it builds its verification:
+
+```php
+return new StandardWebhooks($this->secret(), tolerance: 600);
+```
+
+### A verification for Stripe
+
+Any other scheme is a class implementing `Contracts\Verification`, which has one
+method. Stripe signs `<timestamp>.<raw body>`, hex encoded, in a header of its
+own:
 
 ```php
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Rooberthh\Switchboard\Drivers\HmacDriver;
-use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\Contracts\Verification;
 
-final class StripeDriver extends HmacDriver
+final class StripeVerification implements Verification
 {
-    protected function provider(): string
+    public function __construct(
+        #[SensitiveParameter]
+        private readonly string $secret,
+        private readonly int $tolerance = 300,
+    ) {}
+
+    public function verify(Request $request): bool
+    {
+        // Stripe-Signature: t=1614265330,v1=5257a8...,v0=an older scheme
+        $parts = [];
+
+        foreach (explode(',', (string) $request->header('Stripe-Signature')) as $pair) {
+            [$key, $value] = array_pad(explode('=', $pair, 2), 2, '');
+            $parts[$key][] = $value;
+        }
+
+        $timestamp = $parts['t'][0] ?? null;
+
+        if ($this->secret === '' || ! is_numeric($timestamp)) {
+            return false;
+        }
+
+        if (abs(Carbon::now()->getTimestamp() - (int) $timestamp) > $this->tolerance) {
+            return false;
+        }
+
+        // Stripe signs "<timestamp>.<raw body>", hex encoded.
+        $expected = hash_hmac('sha256', $timestamp . '.' . $request->getContent(), $this->secret);
+
+        // Only v1 is read, so a downgraded v0 signature is never trusted.
+        foreach ($parts['v1'] ?? [] as $signature) {
+            if (hash_equals($expected, $signature)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+```
+
+And the provider that uses it:
+
+```php
+final class StripeProvider extends WebhookProvider
+{
+    public array $handlers = [
+        'invoice.paid' => MarkInvoicePaid::class,
+    ];
+
+    public static function name(): string
     {
         return 'stripe';
     }
 
-    // Stripe signs "<timestamp>.<raw body>" and hex encodes the digest,
-    // which is what HmacDriver does by default.
-    protected function signedPayload(Request $request): string
+    public function verification(): Verification
     {
-        return $this->part($request, 't') . '.' . $request->getContent();
-    }
-
-    // Stripe-Signature: t=1614265330,v1=5257a8...,v0=an older scheme
-    // Only the v1 signatures are returned, so a downgraded v0 is never trusted.
-    protected function signatures(Request $request): array
-    {
-        return $this->parts($request, 'v1');
-    }
-
-    protected function signedAt(Request $request): ?int
-    {
-        $timestamp = $this->part($request, 't');
-
-        return is_numeric($timestamp) ? (int) $timestamp : null;
+        return new StripeVerification($this->secret());
     }
 
     public function normalize(Request $request): InboxMessageData
@@ -182,7 +255,7 @@ final class StripeDriver extends HmacDriver
         $payload = $request->json()->all();
 
         return new InboxMessageData(
-            provider: $this->provider(),
+            provider: static::name(),
             eventId: $payload['id'],
             eventType: $payload['type'],
             data: $payload['data']['object'] ?? [],
@@ -190,61 +263,17 @@ final class StripeDriver extends HmacDriver
             occurredAt: Carbon::createFromTimestamp($payload['created']),
         );
     }
-
-    private function part(Request $request, string $key): ?string
-    {
-        return $this->parts($request, $key)[0] ?? null;
-    }
-
-    /** @return list<string> */
-    private function parts(Request $request, string $key): array
-    {
-        $pairs = explode(',', (string) $request->header('Stripe-Signature'));
-
-        return array_values(array_map(
-            static fn (string $pair): string => explode('=', $pair, 2)[1],
-            array_filter($pairs, static fn (string $pair): bool => str_starts_with($pair, "{$key}=")),
-        ));
-    }
 }
 ```
 
-The three `signed*` methods are the whole of what a provider-specific driver
-owes the base class. Everything security-critical stays in the base class, which
-is verified against the Standard Webhooks reference vectors — including the
-vectors that must *not* verify.
-
-### Providers that sign with Standard Webhooks
-
-`StandardWebhooksDriver` covers the `webhook-id` / `webhook-timestamp` /
-`webhook-signature` scheme, so such a driver only says where its payload's
-fields are. See the quickstart above. It is a *scheme*, not a provider — this is
-also what Switchboard's own outbox will sign with.
-
-### Taking over verification completely
-
-The base class is optional. A driver implementing
-`Rooberthh\Switchboard\Contracts\Driver` directly decides for itself what
-authentic means, and Switchboard will not second-guess it:
-
-```php
-use Rooberthh\Switchboard\Contracts\Driver;
-
-final class InternalDriver implements Driver
-{
-    public function verify(Request $request): bool
-    {
-        return $request->hasValidSignature(); // or mTLS, or a shared token
-    }
-
-    public function normalize(Request $request): InboxMessageData { /* ... */ }
-}
-```
+The same contract covers a request you authenticate some other way entirely —
+`$request->hasValidSignature()`, mTLS, a shared token. Switchboard will not
+second-guess what your verification decides.
 
 ### Where the secret lives
 
-Switchboard never holds a secret. `HmacDriver::secret()` reads
-`config('switchboard.providers.{provider}.secret')`; override it to read a
+Switchboard never holds a secret. `secret()` reads
+`config('switchboard.providers.{name}.secret')`; override it to read a
 per-tenant secret from anywhere else, without touching verification:
 
 ```php
@@ -256,25 +285,28 @@ protected function secret(): string
 
 ## The endpoint
 
-`Switchboard::route()` mounts `POST /webhooks/{provider}`. Both the path and the
-middleware are yours to choose:
+`Switchboard::provider()` mounts `POST /webhooks/{name}` and returns the
+`Route`, so the path and middleware are yours to choose:
 
 ```php
-Switchboard::route('stripe');
-Switchboard::route('stripe', path: 'integrations/stripe/inbound');
-Switchboard::route('stripe', middleware: ['throttle:webhooks']);
+Switchboard::provider(StripeProvider::class);
+Switchboard::provider(StripeProvider::class, path: 'integrations/stripe/inbound');
+Switchboard::provider(StripeProvider::class)->middleware('throttle:webhooks');
 ```
 
-It returns the `Route`, so you can decorate it like any other. Registering a
-route for a provider with no driver throws **at registration time** and names the
-key — a typo fails when your application boots, not by losing a live webhook.
+Register providers in `boot()`, not in a route file: route files do not run once
+routes are cached, and the queue worker needs the provider too. Registration
+builds nothing — `name()` is static — so a provider with expensive dependencies
+costs nothing until a delivery arrives. Registering a class that is not a
+provider, or a second provider under a name already taken, throws **at boot**
+rather than losing a live webhook.
 
 The endpoint is public and unauthenticated by definition, so give it a rate
 limit in production. Switchboard does not impose one, because the right limit
 depends on the provider's delivery volume:
 
 ```php
-Switchboard::route('stripe', middleware: ['throttle:120,1']);
+Switchboard::provider(StripeProvider::class)->middleware('throttle:120,1');
 ```
 
 What a provider sees:
@@ -292,34 +324,26 @@ processing began.
 
 A handler always runs on the queue, against a row that is already stored, so
 slow work never blocks the provider and a crash mid-handling cannot lose the
-event. Event types map to methods through an explicit registry:
+event. It is an invokable class, resolved from the container, so its
+dependencies arrive through its constructor:
 
 ```php
-final class StripeHandler extends Handler
+final class MarkInvoicePaid
 {
-    protected array $handles = [
-        'invoice.paid' => 'invoicePaid',
-        'customer.subscription.deleted' => 'subscriptionDeleted',
-    ];
+    public function __construct(private readonly Ledger $ledger) {}
 
-    public function invoicePaid(InboxMessage $message): void
+    public function __invoke(InboxMessage $message): void
     {
         // $message->data is already decoded.
     }
 }
 ```
 
-A registry rather than a derived method name, because derivation collides
-silently — `customer.subscription.created` and `customer.subscriptionCreated`
-derive to the same name, and routing two different events to the same code is a
-bug you find late. If you want derivation anyway, override `methodFor()`:
-
-```php
-protected function methodFor(InboxMessage $message): ?string
-{
-    return Str::camel(str_replace('.', '_', $message->event_type));
-}
-```
+Its provider maps event types to it exactly. An explicit map rather than a
+derived name, because derivation collides silently —
+`customer.subscription.created` and `customer.subscriptionCreated` derive to the
+same name, and routing two different events to the same code is a bug you find
+late.
 
 ### Handlers must be idempotent
 
@@ -338,7 +362,7 @@ So make the work idempotent: key on `$message->event_id`, guard with a
 conditional update, or check before you act.
 
 ```php
-public function invoicePaid(InboxMessage $message): void
+public function __invoke(InboxMessage $message): void
 {
     // Does nothing the second time.
     $updated = Invoice::query()
@@ -350,7 +374,7 @@ public function invoicePaid(InboxMessage $message): void
         return;
     }
 
-    $this->chargeOnce($message->event_id);
+    $this->ledger->chargeOnce($message->event_id);
 }
 ```
 
@@ -358,11 +382,12 @@ Exactly-once would mean the handler and the `processed_at` write committing
 together, which Switchboard cannot arrange across your database and your queue.
 At-least-once plus an idempotent handler is the arrangement that actually holds.
 
-An event type with no method reaches `unhandled()`, which logs a warning rather
-than dropping it silently. Override it to throw, to notify, or to ignore:
+An event type with no handler reaches the provider's `unhandled()`, which logs a
+warning rather than dropping it silently. Override it to throw, to notify, or to
+ignore:
 
 ```php
-protected function unhandled(InboxMessage $message): void
+public function unhandled(InboxMessage $message): void
 {
     // Silence the event types you have decided you do not care about.
 }
@@ -471,8 +496,8 @@ until a handler says otherwise.
 
 ## Configuration
 
-`config/switchboard.php` holds **data only**. Behaviour is configured through the
-static `Switchboard` class.
+`config/switchboard.php` holds **data only**. Behaviour lives in your provider
+classes, registered through the static `Switchboard` class.
 
 | Key | What it does |
 | --- | --- |
@@ -483,10 +508,10 @@ static `Switchboard` class.
 | `inbox.tries` | Attempts a handler gets before the message is recorded as failed. |
 | `inbox.backoff` | Seconds between attempts. Exponential by default. |
 | `inbox.stale_after` | Seconds a message may be unprocessed before `switchboard:relay` treats its job as lost. `null` derives it from the two rows above and your queue's `retry_after`. |
-| `providers.{key}.secret` | The conventional place a driver reads its secret from. Switchboard itself never reads it. |
+| `providers.{name}.secret` | Where a provider's `secret()` reads from by default. Switchboard itself never reads it. |
 
 Configuration mistakes are loud rather than quiet: a secret that cannot be
-decoded, or a driver that supplies a blank event id, throws instead of turning
+decoded, or a provider that supplies a blank event id, throws instead of turning
 into an endpoint that rejects — or silently discards — every delivery.
 
 ## Public API and compatibility
@@ -495,10 +520,12 @@ Switchboard follows semantic versioning. What that covers:
 
 | Surface | Kind | Promise |
 | --- | --- | --- |
-| `Contracts\Driver`, `Contracts\Handler` | Contract | **Adding a method is a breaking change.** Contracts are kept to 1–3 methods for exactly this reason; new information travels in `InboxMessageData` instead, as an optional constructor argument. |
-| `Drivers\HmacDriver`, `Drivers\StandardWebhooksDriver`, `Inbox\Handler` | Base class | Meant to be extended. Their protected methods are the seams and change only on a major version. |
+| `Contracts\WebhookProvider` | Contract | **Adding a method is a breaking change.** Deliberately larger than the other contracts, so an integration reads as one class (`docs/adr/0005-a-provider-is-one-class.md`). New information travels in `InboxMessageData` instead, as an optional constructor argument. |
+| `Contracts\Verification` | Contract | One method, and kept that way. |
+| `Inbox\WebhookProvider` | Base class | Meant to be extended. Its methods are the seams and change only on a major version. |
+| `Verification\StandardWebhooks` | Verification | The shipped signature scheme. `final`: another scheme is another `Verification`. |
 | `Inbox\InboxMessageData` | Data object | Grows by appending optional constructor arguments. |
-| `Switchboard` | Static entry point | `extend()`, `handledBy()`, `route()`. Behaviour is configured here, never through a facade — there is none. |
+| `Switchboard` | Static entry point | `provider()`, `resolve()`, `providers()`. Providers are registered here, never through a facade — there is none. |
 | `Events\*` | Events | Observation points. They carry the message and will keep carrying it. |
 | `Models\InboxMessage` | Model | Deliberately not `final`; an application may extend it. Nothing in the package names it except one internal resolver, so a model-swap configurator stays a one-line addition. |
 | `config/switchboard.php` | Configuration | Data only: table names, queues, tolerances, retries. |
@@ -508,8 +535,8 @@ A test asserts this boundary, so it cannot drift silently.
 
 ## What Switchboard does not do
 
-- **It ships no provider drivers.** No Stripe, GitHub, Shopify or Slack driver —
-  see above, and `docs/adr/0001-no-shipped-provider-drivers.md`.
+- **It ships no provider classes.** No Stripe, GitHub, Shopify or Slack
+  provider — see above, and `docs/adr/0001-no-shipped-provider-drivers.md`.
 - **It stores no raw bodies and no headers.** An inbox message is a normalized
   record of what an event means, not an audit log of an HTTP request. If you need
   forensics, add a column to your own extended model

@@ -34,15 +34,15 @@ An inbound webhook, persisted on arrival before any handling happens. Persisting
 _Avoid_: WebhookCall, call, incoming webhook, notification
 
 **Provider**:
-The external system an inbox message arrived from, identified by the key its driver is registered under. That one key is also the name in the route and the value in the message's `provider` column.
-_Avoid_: source, sender, integration
+The external system an inbox message arrived from. It is represented in the application by exactly one webhook provider class, which names it, says how its requests are verified, reads what they mean, and maps its event types to handlers. The name that class gives is also the route segment, the secret's config key, and the value in the message's `provider` column. Applications write their own provider classes; Switchboard ships none.
+_Avoid_: source, sender, integration, driver
 
-**Driver**:
-The adapter that teaches Switchboard how to read one provider: whether a request is authentic, and what its event ID and event type are. Applications supply their own; Switchboard ships none.
-_Avoid_: adapter, integration, connector, client
+**Verification**:
+The class a provider's requests are proven authentic with: a signature scheme, holding the secret it is handed but never knowing where that secret lives. Switchboard ships Standard Webhooks; any other scheme is an application's own.
+_Avoid_: validator, signer, guard
 
 **Handler**:
-The application class that acts on an inbox message, one method per event type. Handlers always run on the queue, never during the request that delivered the message.
+The invokable application class that acts on an inbox message, mapped from one event type by its provider. Handlers always run on the queue, never during the request that delivered the message.
 _Avoid_: listener, processor, consumer
 
 **Subject**:

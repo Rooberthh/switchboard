@@ -11,8 +11,8 @@ final class UnknownProvider extends InvalidArgumentException
     public static function for(string $provider): self
     {
         return new self(
-            "No Switchboard driver is registered for the provider [{$provider}]. "
-            . "Register one with Switchboard::extend('{$provider}', ...) in a service provider's boot method.",
+            "No Switchboard provider is registered under the name [{$provider}]. "
+            . "Register its class with Switchboard::provider(...) in a service provider's boot method.",
         );
     }
 }

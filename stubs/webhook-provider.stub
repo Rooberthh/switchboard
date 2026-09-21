@@ -1,0 +1,45 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Illuminate\Http\Request;
+use Rooberthh\Switchboard\Contracts\Verification;
+use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\Inbox\WebhookProvider;
+use Rooberthh\Switchboard\Verification\StandardWebhooks;
+
+final class {{ class }} extends WebhookProvider
+{
+    /**
+     * Event type to the invokable class that handles it, run on the queue.
+     *
+     * @var array<string, class-string>
+     */
+    public array $handlers = [
+        // 'invoice.paid' => \App\Webhooks\Handlers\MarkInvoicePaid::class,
+    ];
+
+    public static function name(): string
+    {
+        return '{{ provider }}';
+    }
+
+    public function verification(): Verification
+    {
+        return new StandardWebhooks($this->secret());
+    }
+
+    public function normalize(Request $request): InboxMessageData
+    {
+        $payload = $request->json()->all();
+
+        return new InboxMessageData(
+            provider: static::name(),
+            eventId: (string) $request->header('webhook-id'),
+            eventType: (string) ($payload['type'] ?? ''),
+            data: (array) ($payload['data'] ?? []),
+        );
+    }
+}

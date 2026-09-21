@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard;
 
 use Illuminate\Support\ServiceProvider;
+use Rooberthh\Switchboard\Console\MakeWebhookProviderCommand;
 use Rooberthh\Switchboard\Console\RelayCommand;
 use Rooberthh\Switchboard\Console\ReplayCommand;
 
@@ -19,6 +20,7 @@ class SwitchboardServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
+                MakeWebhookProviderCommand::class,
                 RelayCommand::class,
                 ReplayCommand::class,
             ]);
