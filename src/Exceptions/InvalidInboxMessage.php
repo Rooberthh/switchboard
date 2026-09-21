@@ -29,10 +29,10 @@ final class InvalidInboxMessage extends InvalidArgumentException
         return new self('An inbox message must belong to a provider: it is half of what a message is idempotent on.');
     }
 
-    public static function providerMismatch(string $provider, string $normalized): self
+    public static function providerMismatch(string $provider, string $claimed): self
     {
         return new self(
-            "The Switchboard provider [{$provider}] normalized a message for [{$normalized}]. "
+            "The Switchboard provider [{$provider}] made an inbox message for [{$claimed}]. "
             . 'Pass provider: static::name() to InboxMessageData: a message filed under another '
             . "provider's name would share that provider's event ids.",
         );

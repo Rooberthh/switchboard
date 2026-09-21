@@ -12,7 +12,7 @@ use Rooberthh\Switchboard\Switchboard;
 use Throwable;
 
 /**
- * Verify, normalize, persist, respond. Holds no provider knowledge and no
+ * Verify, read the message, persist, respond. Holds no provider knowledge and no
  * secret — the registered provider class supplies both — and does no work the
  * provider has to wait for.
  *
@@ -43,7 +43,7 @@ final class InboxController
             return response()->noContent(Response::HTTP_BAD_REQUEST);
         }
 
-        $data = $webhookProvider->normalize($request);
+        $data = $webhookProvider->toInboxMessage($request);
 
         // The name is what stored messages are found by, so a provider may
         // only file messages under its own. Disagreeing is a bug in the

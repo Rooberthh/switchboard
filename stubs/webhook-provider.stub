@@ -31,7 +31,7 @@ final class {{ class }} extends WebhookProvider
         return new StandardWebhooks($this->secret());
     }
 
-    public function normalize(Request $request): InboxMessageData
+    public function toInboxMessage(Request $request): InboxMessageData
     {
         $payload = $request->json()->all();
 
