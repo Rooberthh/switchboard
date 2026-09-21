@@ -7,17 +7,20 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Switchboard;
-use Rooberthh\Switchboard\Tests\Fixtures\FakeDriver;
 use Rooberthh\Switchboard\Tests\Fixtures\ThrowingHandler;
+use Rooberthh\Switchboard\Tests\Fixtures\ThrowingProvider;
 
 beforeEach(function () {
     ThrowingHandler::$attempts = 0;
     ThrowingHandler::$succeedFrom = [];
 
-    Switchboard::extend('acme', new FakeDriver());
-    Switchboard::extend('other', new FakeDriver(provider: 'other'));
-    Switchboard::handledBy('acme', ThrowingHandler::class);
-    Switchboard::handledBy('other', ThrowingHandler::class);
+    Switchboard::provider(ThrowingProvider::class);
+    Switchboard::provider((new class extends ThrowingProvider {
+        public static function name(): string
+        {
+            return 'other';
+        }
+    })::class);
 });
 
 function store(string $provider, string $eventId, array $lifecycle = []): InboxMessage

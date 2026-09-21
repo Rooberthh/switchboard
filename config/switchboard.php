@@ -43,11 +43,11 @@ return [
     |
     | "path" is the prefix the conventional provider endpoint is mounted under,
     | so a provider registered as "stripe" is served at POST /webhooks/stripe.
-    | Pass a path to Switchboard::route() to override it per provider.
+    | Pass a path to Switchboard::provider() to override it per provider.
     |
     | "tolerance" is how many seconds either side of now a signed timestamp may
     | be. It is symmetric: too old and too far in the future are both rejected.
-    | Only drivers built on the shipped HMAC base class read it.
+    | It is the default for the shipped StandardWebhooks verification.
     |
     | "tries" and "backoff" are how a message is processed: how many attempts a
     | handler gets before the message is recorded as failed, and how many
@@ -74,11 +74,12 @@ return [
     | Providers
     |--------------------------------------------------------------------------
     |
-    | The conventional place a driver built on the shipped HMAC base class
-    | reads its secret from. Switchboard itself never reads these: the driver
-    | does, and a driver is free to read its secret somewhere else entirely.
+    | Where a provider class reads its secret from, keyed by the provider's
+    | name. Switchboard itself never reads these: the provider's secret()
+    | method does, and a provider is free to override it and read its secret
+    | somewhere else entirely.
     |
-    |     'stripe' => ['secret' => env('STRIPE_WEBHOOK_SECRET')],
+    |     'acme' => ['secret' => env('ACME_WEBHOOK_SECRET')],
     |
     */
 

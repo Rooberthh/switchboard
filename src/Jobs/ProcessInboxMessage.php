@@ -54,7 +54,15 @@ final class ProcessInboxMessage implements ShouldQueue
             return;
         }
 
-        Switchboard::handler($message->provider)->handle($message);
+        $provider = Switchboard::resolve($message->provider);
+
+        $handler = $provider->handlers[$message->event_type] ?? null;
+
+        if ($handler === null) {
+            $provider->unhandled($message);
+        } else {
+            app($handler)($message);
+        }
 
         app(ProcessInboxMessageAction::class)->execute($message);
     }

@@ -4,21 +4,38 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
-use Rooberthh\Switchboard\Inbox\Handler;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Switchboard;
-use Rooberthh\Switchboard\Tests\Fixtures\FakeDriver as AcmeDriver;
-use Rooberthh\Switchboard\Tests\Fixtures\AcmeHandler;
+use Rooberthh\Switchboard\Tests\Fixtures\FakeProvider;
+use Rooberthh\Switchboard\Tests\Fixtures\RecordingHandler;
 use Illuminate\Testing\TestResponse;
 use Rooberthh\Switchboard\Jobs\ProcessInboxMessage;
 
 beforeEach(function () {
-    AcmeHandler::$calls = [];
-
-    Switchboard::extend('acme', new AcmeDriver());
-    Switchboard::handledBy('acme', AcmeHandler::class);
-    Switchboard::route('acme');
+    RecordingHandler::$calls = [];
 });
+
+/**
+ * Register a provider whose only difference from the fake is its handlers.
+ *
+ * @param  array<string, class-string>  $handlers
+ */
+function providerHandling(array $handlers): void
+{
+    $provider = new class extends FakeProvider {
+        /** @var array<string, class-string> */
+        public static array $mapped = [];
+
+        public function __construct()
+        {
+            $this->handlers = self::$mapped;
+        }
+    };
+
+    $provider::$mapped = $handlers;
+
+    Switchboard::provider($provider::class);
+}
 
 function send(string $type = 'invoice.paid', string $id = 'evt_1'): TestResponse
 {
@@ -32,6 +49,8 @@ function queued(): array
 }
 
 it('dispatches a queued job when a message is persisted', function () {
+    Switchboard::provider(FakeProvider::class);
+
     Queue::fake();
 
     send()->assertNoContent();
@@ -40,15 +59,19 @@ it('dispatches a queued job when a message is persisted', function () {
 });
 
 it('does not run the handler during the request that delivered the message', function () {
+    Switchboard::provider(FakeProvider::class);
+
     Queue::fake();
 
     send()->assertNoContent();
 
-    expect(AcmeHandler::$calls)->toBe([])
+    expect(RecordingHandler::$calls)->toBe([])
         ->and(InboxMessage::query()->sole()->processed_at)->toBeNull();
 });
 
 it('dispatches nothing for a duplicate delivery', function () {
+    Switchboard::provider(FakeProvider::class);
+
     Queue::fake();
 
     send()->assertNoContent();
@@ -58,6 +81,8 @@ it('dispatches nothing for a duplicate delivery', function () {
 });
 
 it('takes the queue connection and queue name from configuration', function () {
+    Switchboard::provider(FakeProvider::class);
+
     config(['switchboard.queue.connection' => 'redis', 'switchboard.queue.name' => 'webhooks']);
 
     Queue::fake();
@@ -70,88 +95,88 @@ it('takes the queue connection and queue name from configuration', function () {
         ->and($job->connection)->toBe('redis');
 });
 
-it('routes an event type to the matching method on the handler', function () {
+it('runs the handler mapped to the event type', function () {
+    Switchboard::provider(FakeProvider::class);
+
     send('invoice.paid', 'evt_1')->assertNoContent();
 
-    expect(AcmeHandler::$calls)->toBe(['invoicePaid:evt_1']);
+    expect(RecordingHandler::$calls)->toBe(['invoice.paid:evt_1']);
 });
 
-it('keeps event types apart that a naive derivation would collide', function () {
+it('matches event types exactly, so ones a naive derivation would collide stay apart', function () {
+    $first = new class {
+        public function __invoke(InboxMessage $message): void
+        {
+            RecordingHandler::$calls[] = "first:{$message->event_type}";
+        }
+    };
+
+    providerHandling([
+        'customer.subscription.created' => RecordingHandler::class,
+        'customer.subscriptionCreated' => $first::class,
+    ]);
+
     send('customer.subscription.created', 'evt_1')->assertNoContent();
     send('customer.subscriptionCreated', 'evt_2')->assertNoContent();
-    send('issue_comment.created', 'evt_3')->assertNoContent();
 
-    expect(AcmeHandler::$calls)->toBe([
-        'subscriptionCreated:evt_1',
-        'legacySubscriptionCreated:evt_2',
-        'issueCommentCreated:evt_3',
+    expect(RecordingHandler::$calls)->toBe([
+        'customer.subscription.created:evt_1',
+        'first:customer.subscriptionCreated',
     ]);
 });
 
-it('reaches the fallback for an event type with no method', function () {
+it('hands an unmapped event type to the provider rather than dropping it', function () {
+    $provider = new class extends FakeProvider {
+        public function unhandled(InboxMessage $message): void
+        {
+            RecordingHandler::$calls[] = "unhandled:{$message->event_type}";
+        }
+    };
+
+    Switchboard::provider($provider::class);
+
     send('invoice.voided', 'evt_1')->assertNoContent();
 
-    expect(AcmeHandler::$calls)->toBe(['unhandled:invoice.voided']);
+    expect(RecordingHandler::$calls)->toBe(['unhandled:invoice.voided'])
+        ->and(InboxMessage::query()->sole()->isProcessed())->toBeTrue();
 });
 
-it('makes an unhandled event type visible rather than dropping it silently', function () {
+it('makes an unhandled event type visible by default', function () {
     Log::spy();
 
-    Switchboard::handledBy('acme', new class extends Handler {});
+    providerHandling([]);
 
     send('invoice.voided', 'evt_1')->assertNoContent();
 
     Log::shouldHaveReceived('warning')->once();
 });
 
-it('lets an application replace the mapping entirely', function () {
-    Switchboard::handledBy('acme', new class extends Handler {
-        /** @var list<string> */
-        public static array $calls = [];
+it('builds the handler through the container, so it can take dependencies', function () {
+    $handler = new class (new ArrayObject()) {
+        public function __construct(public ArrayObject $ledger) {}
 
-        // Derivation rather than a registry, which is the application's
-        // decision to make.
-        protected function methodFor(InboxMessage $message): ?string
+        public function __invoke(InboxMessage $message): void
         {
-            return lcfirst(str_replace(' ', '', ucwords(str_replace(['.', '_'], ' ', $message->event_type))));
+            $this->ledger->append($message);
         }
+    };
 
-        public function invoicePaid(InboxMessage $message): void
-        {
-            AcmeHandler::$calls[] = "derived:{$message->event_id}";
-        }
-    });
+    $ledger = new ArrayObject();
+    app()->bind($handler::class, fn() => new ($handler::class)($ledger));
+
+    providerHandling(['invoice.paid' => $handler::class]);
 
     send('invoice.paid', 'evt_1')->assertNoContent();
 
-    expect(AcmeHandler::$calls)->toBe(['derived:evt_1']);
-});
-
-it('hands the handler the inbox message itself', function () {
-    $seen = null;
-
-    Switchboard::handledBy('acme', new class ($seen) extends Handler {
-        public function __construct(public mixed &$seen) {}
-
-        protected function methodFor(InboxMessage $message): ?string
-        {
-            return 'record';
-        }
-
-        public function record(InboxMessage $message): void
-        {
-            $this->seen = $message;
-        }
-    });
-
-    send('invoice.paid', 'evt_1')->assertNoContent();
-
-    expect($seen)->toBeInstanceOf(InboxMessage::class)
-        ->and($seen->event_id)->toBe('evt_1')
-        ->and($seen->data)->toBe(['amount' => 1000]);
+    expect($ledger)->toHaveCount(1)
+        ->and($ledger[0])->toBeInstanceOf(InboxMessage::class)
+        ->and($ledger[0]->event_id)->toBe('evt_1')
+        ->and($ledger[0]->data)->toBe(['amount' => 1000]);
 });
 
 it('marks a message processed when the handler returns', function () {
+    Switchboard::provider(FakeProvider::class);
+
     $this->freezeTime();
 
     send()->assertNoContent();
@@ -165,11 +190,13 @@ it('marks a message processed when the handler returns', function () {
 });
 
 it('does not process a message twice', function () {
+    Switchboard::provider(FakeProvider::class);
+
     send()->assertNoContent();
 
     $message = InboxMessage::query()->sole();
 
     ProcessInboxMessage::dispatch($message->id);
 
-    expect(AcmeHandler::$calls)->toBe(['invoicePaid:evt_1']);
+    expect(RecordingHandler::$calls)->toBe(['invoice.paid:evt_1']);
 });

@@ -8,16 +8,16 @@ use DateTimeInterface;
 use Rooberthh\Switchboard\Exceptions\InvalidInboxMessage;
 
 /**
- * What a driver read out of a request: the fields an inbox message is made of.
+ * What a provider read out of a request: the fields an inbox message is made of.
  *
- * Public API. This is the growth point of the driver contract — a field added
- * here as an optional constructor argument is additive, where a method added to
- * the contract itself would break every driver an application has written.
+ * Public API. A field added here as an optional constructor argument is
+ * additive, where a method added to the provider contract would break every
+ * provider an application has written.
  */
 final readonly class InboxMessageData
 {
     /**
-     * @param  string  $provider  The key the driver is registered under. The inbox refuses a message whose provider does not match the route it arrived on.
+     * @param  string  $provider  The provider's name — pass static::name(). The inbox refuses a message filed under any other provider.
      * @param  string  $eventId  The provider's identifier for the event; what a message is idempotent on.
      * @param  string  $eventType  The provider's dotted event name, such as "invoice.paid".
      * @param  array<string, mixed>  $data  The normalized payload.

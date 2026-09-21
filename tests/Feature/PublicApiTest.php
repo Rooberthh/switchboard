@@ -6,9 +6,10 @@ use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Support\Facades\File;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Illuminate\Support\Collection;
-use Rooberthh\Switchboard\Contracts\Driver;
-use Rooberthh\Switchboard\Drivers\HmacDriver;
-use Rooberthh\Switchboard\Inbox\Handler;
+use Rooberthh\Switchboard\Contracts\Verification;
+use Rooberthh\Switchboard\Contracts\WebhookProvider;
+use Rooberthh\Switchboard\Inbox\WebhookProvider as BaseWebhookProvider;
+use Rooberthh\Switchboard\Verification\StandardWebhooks;
 
 /**
  * The compatibility policy, as a test. Every contract is public API; every
@@ -65,9 +66,13 @@ it('marks nothing outside the internals as internal', function () {
     }
 });
 
-it('keeps every published contract to three methods or fewer', function () {
+it('keeps every published contract to three methods or fewer, bar the provider', function () {
     $contracts = packageClasses()->filter(
         fn(string $class): bool => str_starts_with($class, 'Rooberthh\\Switchboard\\Contracts\\'),
+    )->reject(
+        // Deliberately large, so an integrator sees a whole integration in one
+        // class. docs/adr/0005-a-provider-is-one-class.md
+        fn(string $class): bool => $class === WebhookProvider::class,
     );
 
     expect($contracts)->not->toBeEmpty();
@@ -79,11 +84,10 @@ it('keeps every published contract to three methods or fewer', function () {
     }
 });
 
-it('ships an abstract base class beside every contract', function () {
-    expect((new ReflectionClass(HmacDriver::class))->isAbstract())->toBeTrue()
-        ->and((new ReflectionClass(HmacDriver::class))->implementsInterface(Driver::class))->toBeTrue()
-        ->and((new ReflectionClass(Handler::class))->isAbstract())->toBeTrue()
-        ->and((new ReflectionClass(Handler::class))->implementsInterface(Rooberthh\Switchboard\Contracts\Handler::class))->toBeTrue();
+it('ships an implementation to start from beside every contract', function () {
+    expect((new ReflectionClass(BaseWebhookProvider::class))->isAbstract())->toBeTrue()
+        ->and((new ReflectionClass(BaseWebhookProvider::class))->implementsInterface(WebhookProvider::class))->toBeTrue()
+        ->and((new ReflectionClass(StandardWebhooks::class))->implementsInterface(Verification::class))->toBeTrue();
 });
 
 it('leaves the inbox message model open for an application to extend', function () {

@@ -6,21 +6,31 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
-use Rooberthh\Switchboard\Contracts\Driver;
+use Rooberthh\Switchboard\Contracts\Verification;
 use Rooberthh\Switchboard\Exceptions\InvalidInboxMessage;
 use Rooberthh\Switchboard\Inbox\InboxMessageData;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Switchboard;
-use Rooberthh\Switchboard\Tests\Fixtures\FakeDriver;
+use Rooberthh\Switchboard\Tests\Fixtures\FakeProvider;
+use Rooberthh\Switchboard\Tests\Fixtures\FakeVerification;
 use Illuminate\Testing\TestResponse;
 
 beforeEach(function () {
     // These suites are about the request, not about what happens after it.
     Queue::fake();
 
-    Switchboard::extend('acme', new FakeDriver());
-    Switchboard::route('acme');
+    Switchboard::provider(FakeProvider::class);
 });
+
+/**
+ * Swap the registered provider for one the test has changed.
+ * @param FakeProvider $provider
+ */
+function replaceProvider(FakeProvider $provider): void
+{
+    Switchboard::flush();
+    Switchboard::provider($provider::class);
+}
 
 function deliver(array $payload = []): TestResponse
 {
@@ -31,7 +41,7 @@ function deliver(array $payload = []): TestResponse
     ], $payload));
 }
 
-it('persists a verified message with every field the driver supplied', function () {
+it('persists a verified message with every field the provider supplied', function () {
     deliver([
         'subject' => 'cus_12345',
         'occurred_at' => '2026-09-18T10:00:00+00:00',
@@ -60,7 +70,7 @@ it('falls back to receipt time when the provider supplies no timestamp', functio
     expect($message->occurred_at->timestamp)->toBe($message->created_at->timestamp);
 });
 
-it('persists a null subject when the driver supplies none', function () {
+it('persists a null subject when the provider supplies none', function () {
     deliver()->assertNoContent();
 
     expect(InboxMessage::query()->sole()->subject)->toBeNull();
@@ -90,12 +100,7 @@ it('lets the first delivery win: a duplicate leaves the stored message untouched
 it('deduplicates by recovering from the unique index, not by reading before writing', function () {
     // A racing delivery of the same event commits between verification and our
     // own insert. Only insert-first-and-recover survives this.
-    Switchboard::extend('acme', new class implements Driver {
-        public function verify(Request $request): bool
-        {
-            return true;
-        }
-
+    replaceProvider(new class extends FakeProvider {
         public function normalize(Request $request): InboxMessageData
         {
             DB::table('switchboard_inbox_messages')->insert([
@@ -119,24 +124,29 @@ it('deduplicates by recovering from the unique index, not by reading before writ
         ->and(InboxMessage::query()->sole()->data)->toBe(['racer' => true]);
 });
 
-it('rejects a request the driver does not verify, and persists nothing', function () {
-    Switchboard::extend('acme', new FakeDriver(verifies: false));
+it('rejects a request the provider does not verify, and persists nothing', function () {
+    replaceProvider(new class extends FakeProvider {
+        public function verification(): Verification
+        {
+            return new FakeVerification(verifies: false);
+        }
+    });
 
     deliver()->assertStatus(400)->assertNoContent(400);
 
     expect(InboxMessage::query()->count())->toBe(0);
 });
 
-it('rejects a request whose driver blows up rather than answering', function () {
-    Switchboard::extend('acme', new class implements Driver {
-        public function verify(Request $request): bool
+it('rejects a request whose verification blows up rather than answering', function () {
+    replaceProvider(new class extends FakeProvider {
+        public function verification(): Verification
         {
-            throw new RuntimeException('the signature header was not what I expected');
-        }
-
-        public function normalize(Request $request): InboxMessageData
-        {
-            throw new RuntimeException('never reached');
+            return new class implements Verification {
+                public function verify(Request $request): bool
+                {
+                    throw new RuntimeException('the signature header was not what I expected');
+                }
+            };
         }
     });
 
@@ -209,16 +219,11 @@ it('writes before it reads, so a racing delivery cannot slip in between', functi
         ->and($queries[0])->toStartWith('insert into');
 });
 
-it('refuses a driver that supplies a blank event id rather than collapsing the dedupe key', function () {
-    Switchboard::extend('acme', new class implements Driver {
-        public function verify(Request $request): bool
-        {
-            return true;
-        }
-
+it('refuses a provider that supplies a blank event id rather than collapsing the dedupe key', function () {
+    replaceProvider(new class extends FakeProvider {
         public function normalize(Request $request): InboxMessageData
         {
-            // The header this driver reads its id from is not being sent.
+            // The header this provider reads its id from is not being sent.
             return new InboxMessageData(provider: 'acme', eventId: '', eventType: 'invoice.paid');
         }
     });
@@ -230,7 +235,7 @@ it('refuses a driver that supplies a blank event id rather than collapsing the d
     expect(InboxMessage::query()->count())->toBe(0);
 });
 
-it('refuses a driver that supplies a blank event type', function () {
+it('refuses a provider that supplies a blank event type', function () {
     expect(fn() => new InboxMessageData(provider: 'acme', eventId: 'evt_1', eventType: ' '))
         ->toThrow(InvalidInboxMessage::class);
 });
@@ -240,13 +245,8 @@ it('refuses a blank provider', function () {
         ->toThrow(InvalidInboxMessage::class);
 });
 
-it('refuses a driver that files a message under another provider, and persists nothing', function () {
-    Switchboard::extend('acme', new class implements Driver {
-        public function verify(Request $request): bool
-        {
-            return true;
-        }
-
+it('refuses a provider that files a message under another provider, and persists nothing', function () {
+    replaceProvider(new class extends FakeProvider {
         public function normalize(Request $request): InboxMessageData
         {
             return new InboxMessageData(provider: 'stripe', eventId: 'evt_1', eventType: 'invoice.paid');
