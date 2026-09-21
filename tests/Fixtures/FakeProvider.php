@@ -30,7 +30,7 @@ class FakeProvider extends WebhookProvider
         return new FakeVerification();
     }
 
-    public function toInboxMessage(Request $request): InboxMessageData
+    public function toInboxMessageData(Request $request): InboxMessageData
     {
         /** @var array<string, mixed> $payload */
         $payload = $request->json()->all();

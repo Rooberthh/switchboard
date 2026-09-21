@@ -53,7 +53,7 @@ interface WebhookProvider
      *
      * @param Request $request
      */
-    public function toInboxMessage(Request $request): InboxMessageData;
+    public function toInboxMessageData(Request $request): InboxMessageData;
 
     /**
      * What to do with a message whose event type has no handler.

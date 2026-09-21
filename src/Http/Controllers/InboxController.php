@@ -43,7 +43,7 @@ final class InboxController
             return response()->noContent(Response::HTTP_BAD_REQUEST);
         }
 
-        $data = $webhookProvider->toInboxMessage($request);
+        $data = $webhookProvider->toInboxMessageData($request);
 
         // The name is what stored messages are found by, so a provider may
         // only file messages under its own. Disagreeing is a bug in the
