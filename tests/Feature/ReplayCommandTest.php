@@ -15,7 +15,7 @@ beforeEach(function () {
     ThrowingHandler::$succeedFrom = [];
 
     Switchboard::extend('acme', new FakeDriver());
-    Switchboard::extend('other', new FakeDriver());
+    Switchboard::extend('other', new FakeDriver(provider: 'other'));
     Switchboard::handledBy('acme', ThrowingHandler::class);
     Switchboard::handledBy('other', ThrowingHandler::class);
 });

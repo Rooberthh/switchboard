@@ -17,6 +17,7 @@ use Rooberthh\Switchboard\Exceptions\InvalidInboxMessage;
 final readonly class InboxMessageData
 {
     /**
+     * @param  string  $provider  The key the driver is registered under. The inbox refuses a message whose provider does not match the route it arrived on.
      * @param  string  $eventId  The provider's identifier for the event; what a message is idempotent on.
      * @param  string  $eventType  The provider's dotted event name, such as "invoice.paid".
      * @param  array<string, mixed>  $data  The normalized payload.
@@ -24,12 +25,17 @@ final readonly class InboxMessageData
      * @param  DateTimeInterface|null  $occurredAt  When the provider says the event happened. Receipt time is used when it says nothing.
      */
     public function __construct(
+        public string $provider,
         public string $eventId,
         public string $eventType,
         public array $data = [],
         public ?string $subject = null,
         public ?DateTimeInterface $occurredAt = null,
     ) {
+        if (trim($provider) === '') {
+            throw InvalidInboxMessage::blankProvider();
+        }
+
         // Guarded here rather than at the database, where a blank event id
         // would not violate the unique index — it would quietly match the
         // last event that had one.

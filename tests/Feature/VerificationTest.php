@@ -123,7 +123,7 @@ it('works with a driver that ignores the base class entirely', function () {
 
         public function normalize(Request $request): InboxMessageData
         {
-            return new InboxMessageData(eventId: 'evt_1', eventType: 'invoice.paid');
+            return new InboxMessageData(provider: 'acme', eventId: 'evt_1', eventType: 'invoice.paid');
         }
     });
 

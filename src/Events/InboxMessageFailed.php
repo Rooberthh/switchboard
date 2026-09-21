@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rooberthh\Switchboard\Events;
 
+use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Throwable;
 
@@ -13,7 +14,7 @@ use Throwable;
  * This is the event to alert on. An observation point, not a replacement seam.
  * Public API.
  */
-final readonly class InboxMessageFailed
+final readonly class InboxMessageFailed implements ShouldDispatchAfterCommit
 {
     public function __construct(
         public InboxMessage $message,

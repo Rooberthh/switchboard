@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Rooberthh\Switchboard\Models;
 
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Rooberthh\Switchboard\Inbox\Staleness;
 
 /**
  * An inbound webhook, persisted on arrival before anything acts on it.
@@ -29,6 +31,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $occurred_at
  * @property Carbon|null $processed_at
  * @property Carbon|null $failed_at
+ * @property Carbon|null $relayed_at
  * @property string|null $last_error
  * @property Carbon $created_at
  * @property Carbon $updated_at
@@ -52,6 +55,7 @@ class InboxMessage extends Model
             'occurred_at' => 'datetime',
             'processed_at' => 'datetime',
             'failed_at' => 'datetime',
+            'relayed_at' => 'datetime',
         ];
     }
 
@@ -67,6 +71,9 @@ class InboxMessage extends Model
 
     /**
      * Neither succeeded nor failed yet, whether or not a worker has it.
+     *
+     * Deliberately blind to relayed_at: relaying a message does not move it
+     * along the lifecycle, it only records that the relay has already had a go.
      */
     public function isUnprocessed(): bool
     {
@@ -98,6 +105,33 @@ class InboxMessage extends Model
     public function scopeUnprocessed(Builder $query): Builder
     {
         return $query->whereNull('processed_at')->whereNull('failed_at');
+    }
+
+    /**
+     * Unprocessed for longer than it could still legitimately be in flight,
+     * and not already relayed once.
+     *
+     * @param  Builder<static>  $query
+     * @param  DateTimeInterface|null  $before
+     * @return Builder<static>
+     */
+    public function scopeStale(Builder $query, ?DateTimeInterface $before = null): Builder
+    {
+        return $query->unprocessed()
+            ->whereNull('relayed_at')
+            ->where('created_at', '<', $before ?? Staleness::cutoff());
+    }
+
+    /**
+     * Already re-dispatched by the relay. Combined with unprocessed(), this is
+     * the query that says nothing is consuming the queue at all.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeRelayed(Builder $query): Builder
+    {
+        return $query->whereNotNull('relayed_at');
     }
 
     /**

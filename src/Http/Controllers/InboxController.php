@@ -6,9 +6,8 @@ namespace Rooberthh\Switchboard\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Rooberthh\Switchboard\Events\InboxMessageReceived;
-use Rooberthh\Switchboard\Inbox\InboxMessages;
-use Rooberthh\Switchboard\Jobs\ProcessInboxMessage;
+use Rooberthh\Switchboard\Actions\CreateInboxMessageAction;
+use Rooberthh\Switchboard\Exceptions\InvalidInboxMessage;
 use Rooberthh\Switchboard\Switchboard;
 use Throwable;
 
@@ -44,26 +43,15 @@ final class InboxController
 
         $data = $driver->normalize($request);
 
-        $message = InboxMessages::createOrFirst(
-            [
-                'provider' => $provider,
-                'event_id' => $data->eventId,
-            ],
-            [
-                'event_type' => $data->eventType,
-                'subject' => $data->subject,
-                'data' => $data->data,
-                'occurred_at' => $data->occurredAt ?? now(),
-            ],
-        );
-
-        if ($message->wasRecentlyCreated) {
-            // Both after commit, so nothing acts on a message that the
-            // surrounding transaction then rolled back.
-            ProcessInboxMessage::dispatch($message->id)->afterCommit();
-
-            event(new InboxMessageReceived($message));
+        // The route's key is what the driver was registered under, and so the
+        // only provider this request can be for. Disagreeing is a driver bug,
+        // not a forgery — it has already verified — so it throws and is
+        // reported rather than answering the provider with a rejection.
+        if ($data->provider !== $provider) {
+            throw InvalidInboxMessage::providerMismatch($provider, $data->provider);
         }
+
+        app(CreateInboxMessageAction::class)->execute($data);
 
         return response()->noContent();
     }

@@ -69,6 +69,7 @@ final class AcmeDriver extends StandardWebhooksDriver
         $payload = $request->json()->all();
 
         return new InboxMessageData(
+            provider: $this->provider(),
             eventId: (string) $request->header('webhook-id'),
             eventType: $payload['type'],
             data: $payload['data'],
@@ -181,6 +182,7 @@ final class StripeDriver extends HmacDriver
         $payload = $request->json()->all();
 
         return new InboxMessageData(
+            provider: $this->provider(),
             eventId: $payload['id'],
             eventType: $payload['type'],
             data: $payload['data']['object'] ?? [],
@@ -319,6 +321,43 @@ protected function methodFor(InboxMessage $message): ?string
 }
 ```
 
+### Handlers must be idempotent
+
+Switchboard deduplicates **deliveries**, not **handler runs**. Those are
+different promises, and the difference matters:
+
+- One row per event, always. A provider that retries a delivery it already made
+  inserts nothing and runs nothing.
+- **Processing is at-least-once.** A handler that throws is retried — five times
+  by default — and a handler that threw *after* charging a card will charge it
+  again on the next attempt. A handler killed mid-run (a deploy, an OOM, a
+  timeout) is retried too, from the beginning. And a message recovered by the
+  relay starts again at attempt one, so its lifetime runs can exceed `tries`.
+
+So make the work idempotent: key on `$message->event_id`, guard with a
+conditional update, or check before you act.
+
+```php
+public function invoicePaid(InboxMessage $message): void
+{
+    // Does nothing the second time.
+    $updated = Invoice::query()
+        ->where('stripe_id', $message->subject)
+        ->whereNull('paid_at')
+        ->update(['paid_at' => $message->occurred_at]);
+
+    if ($updated === 0) {
+        return;
+    }
+
+    $this->chargeOnce($message->event_id);
+}
+```
+
+Exactly-once would mean the handler and the `processed_at` write committing
+together, which Switchboard cannot arrange across your database and your queue.
+At-least-once plus an idempotent handler is the arrangement that actually holds.
+
 An event type with no method reaches `unhandled()`, which logs a warning rather
 than dropping it silently. Override it to throw, to notify, or to ignore:
 
@@ -389,6 +428,47 @@ Replay means **re-run, not re-verify**. An inbox message is a normalized record
 rather than a capture of the request, so a stored message's signature can never
 be recomputed. Verification happens once, at the edge.
 
+### Relay
+
+A message is stored *before* its processing job is queued, so a queue that was
+down in between leaves the message persisted and unprocessed with nothing on its
+way to handle it. The provider's retry cannot heal that — it is deduplicated,
+and dispatches nothing — and replay only looks at failures.
+
+The relay is the sweep that closes the gap. Schedule it:
+
+```php
+// bootstrap/app.php, or a service provider
+Schedule::command('switchboard:relay')->everyFifteenMinutes()->withoutOverlapping();
+```
+
+```bash
+php artisan switchboard:relay
+php artisan switchboard:relay --provider=stripe --limit=200
+```
+
+It queues messages that have been unprocessed for longer than they could still
+plausibly be in flight — derived from `inbox.tries`, `inbox.backoff` and your
+queue connection's `retry_after`, and overridable with `inbox.stale_after`. Set
+that yourself if a handler of yours legitimately runs for hours.
+
+**A message is relayed at most once.** That is deliberate: without it, an outage
+amplifies, and a relay running every fifteen minutes against ten thousand
+stranded messages would queue them again and again. Once is enough to recover
+from a lost job, and anything a single relay does not fix is not a lost job.
+
+Which is why the relay is also the alarm. Messages that were relayed and are
+*still* unprocessed mean nothing is consuming the queue at all — most often a
+`switchboard.queue.name` the deployed workers do not run. The command warns and
+logs when it finds them:
+
+```php
+InboxMessage::query()->relayed()->unprocessed()->count();
+```
+
+Relaying is not a lifecycle step: a relayed message is still **unprocessed**
+until a handler says otherwise.
+
 ## Configuration
 
 `config/switchboard.php` holds **data only**. Behaviour is configured through the
@@ -402,6 +482,7 @@ static `Switchboard` class.
 | `inbox.tolerance` | Seconds either side of now a signed timestamp may be. Default `300`, and symmetric: too old and too far in the future are both rejected. |
 | `inbox.tries` | Attempts a handler gets before the message is recorded as failed. |
 | `inbox.backoff` | Seconds between attempts. Exponential by default. |
+| `inbox.stale_after` | Seconds a message may be unprocessed before `switchboard:relay` treats its job as lost. `null` derives it from the two rows above and your queue's `retry_after`. |
 | `providers.{key}.secret` | The conventional place a driver reads its secret from. Switchboard itself never reads it. |
 
 Configuration mistakes are loud rather than quiet: a secret that cannot be
@@ -421,7 +502,7 @@ Switchboard follows semantic versioning. What that covers:
 | `Events\*` | Events | Observation points. They carry the message and will keep carrying it. |
 | `Models\InboxMessage` | Model | Deliberately not `final`; an application may extend it. Nothing in the package names it except one internal resolver, so a model-swap configurator stays a one-line addition. |
 | `config/switchboard.php` | Configuration | Data only: table names, queues, tolerances, retries. |
-| `Http\*`, `Jobs\*`, `Console\*`, `Inbox\InboxMessages` | **Internal** | `final` and `@internal`. Swap behaviour through a seam above, never by subclassing these. They change without a major version. |
+| `Actions\*`, `Http\*`, `Jobs\*`, `Console\*`, `Inbox\InboxMessages`, `Inbox\Staleness` | **Internal** | `final` and `@internal`. Swap behaviour through a seam above, never by subclassing these. They change without a major version. |
 
 A test asserts this boundary, so it cannot drift silently.
 

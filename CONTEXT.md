@@ -19,6 +19,14 @@ _Avoid_: event name, topic, trigger
 The identifier that makes a message idempotent: the provider's own id on the inbox, and the message's own id on the outbox, sent as `webhook-id`.
 _Avoid_: idempotency key, external id
 
+**Relay**:
+The scheduled sweep that finds messages or deliveries which are due but were never queued, and queues them. It is what makes processing and delivery at-least-once rather than best-effort. Relaying is not a lifecycle step: a relayed inbox message is still unprocessed.
+_Avoid_: sweeper, cron, reaper
+
+**Stale**:
+Unprocessed for longer than it could still plausibly be in flight, so its job is presumed lost. Since there is no in-flight state, staleness is an inference from age, never an observation.
+_Avoid_: stuck, orphaned, abandoned
+
 ### Inbox
 
 **Inbox message**:
@@ -45,6 +53,10 @@ _Avoid_: entity id, object id, resource, target
 A message that has neither succeeded nor failed yet. Switchboard has no in-flight state: a message being worked on right now is still unprocessed.
 _Avoid_: pending, queued, in progress
 
+**Marking processed**:
+Recording that a handler succeeded. Distinct from *processing*, which is the handler running on the queue: the handler does the work, marking is the record of it, and only the record moves a message out of unprocessed. The same split holds for failing a message.
+_Avoid_: completing, finishing, closing
+
 **Reconciliation**:
 Asking a provider for the events it says it sent, to find the ones that never arrived.
 _Avoid_: backfill, catch-up, sync
@@ -66,10 +78,6 @@ _Avoid_: attempt, call, log entry
 **Emit**:
 To write an outbox message and its deliveries, inside whatever transaction the caller is already in. Emitting never performs HTTP.
 _Avoid_: send, dispatch, fire, publish
-
-**Relay**:
-The scheduled sweep that finds deliveries which are due but were never queued, and queues them. It is what makes delivery at-least-once rather than best-effort.
-_Avoid_: sweeper, cron, reaper
 
 **Replay**:
 Re-running a message that was already persisted, in either direction.

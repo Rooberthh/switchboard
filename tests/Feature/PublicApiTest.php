@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Support\Facades\File;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Illuminate\Support\Collection;
@@ -22,16 +23,29 @@ function packageClasses(): Collection
         ->values();
 }
 
-it('keeps every internal final and marked internal', function () {
-    $internalNamespaces = ['Console', 'Http', 'Jobs'];
+/**
+ * Internals that do not live under an internal namespace, and so have to be
+ * named one by one. Keep the list short: it is easier to justify a namespace
+ * than an exception.
+ * @param string $class
+ */
+function isInternal(string $class): bool
+{
+    $named = [
+        'Rooberthh\\Switchboard\\Inbox\\InboxMessages',
+        'Rooberthh\\Switchboard\\Inbox\\Staleness',
+    ];
 
-    $shouldBeInternal = packageClasses()
-        ->filter(function (string $class) use ($internalNamespaces): bool {
-            return $class === 'Rooberthh\\Switchboard\\Inbox\\InboxMessages'
-                || collect($internalNamespaces)->contains(
-                    fn(string $namespace): bool => str_starts_with($class, "Rooberthh\\Switchboard\\{$namespace}\\"),
-                );
-        });
+    $namespaces = ['Actions', 'Console', 'Http', 'Jobs'];
+
+    return in_array($class, $named, true)
+        || collect($namespaces)->contains(
+            fn(string $namespace): bool => str_starts_with($class, "Rooberthh\\Switchboard\\{$namespace}\\"),
+        );
+}
+
+it('keeps every internal final and marked internal', function () {
+    $shouldBeInternal = packageClasses()->filter(fn(string $class): bool => isInternal($class));
 
     expect($shouldBeInternal)->not->toBeEmpty();
 
@@ -44,11 +58,7 @@ it('keeps every internal final and marked internal', function () {
 });
 
 it('marks nothing outside the internals as internal', function () {
-    $public = packageClasses()
-        ->reject(fn(string $class): bool => str_starts_with($class, 'Rooberthh\\Switchboard\\Console\\')
-            || str_starts_with($class, 'Rooberthh\\Switchboard\\Http\\')
-            || str_starts_with($class, 'Rooberthh\\Switchboard\\Jobs\\')
-            || $class === 'Rooberthh\\Switchboard\\Inbox\\InboxMessages');
+    $public = packageClasses()->reject(fn(string $class): bool => isInternal($class));
 
     foreach ($public as $class) {
         expect((string) (new ReflectionClass($class))->getDocComment())->not->toContain('@internal');
@@ -78,4 +88,19 @@ it('ships an abstract base class beside every contract', function () {
 
 it('leaves the inbox message model open for an application to extend', function () {
     expect((new ReflectionClass(InboxMessage::class))->isFinal())->toBeFalse();
+});
+
+it('holds every event until the surrounding transaction commits', function () {
+    // Nothing may act on a message that the transaction then rolled back, and
+    // an event added later must not be able to forget that quietly.
+    $events = packageClasses()->filter(
+        fn(string $class): bool => str_starts_with($class, 'Rooberthh\\Switchboard\\Events\\'),
+    );
+
+    expect($events)->not->toBeEmpty();
+
+    foreach ($events as $event) {
+        expect((new ReflectionClass($event))->implementsInterface(ShouldDispatchAfterCommit::class))
+            ->toBeTrue("{$event} must implement ShouldDispatchAfterCommit");
+    }
 });

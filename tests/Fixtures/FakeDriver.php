@@ -15,7 +15,10 @@ use Rooberthh\Switchboard\Inbox\InboxMessageData;
  */
 class FakeDriver implements Driver
 {
-    public function __construct(private readonly bool $verifies = true) {}
+    public function __construct(
+        private readonly bool $verifies = true,
+        private readonly string $provider = 'acme',
+    ) {}
 
     public function verify(Request $request): bool
     {
@@ -28,6 +31,7 @@ class FakeDriver implements Driver
         $payload = $request->json()->all();
 
         return new InboxMessageData(
+            provider: $this->provider,
             eventId: (string) $payload['id'],
             eventType: (string) $payload['type'],
             data: is_array($payload['data'] ?? null) ? $payload['data'] : [],
