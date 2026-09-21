@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Rooberthh\Switchboard\Actions\Inbox;
+namespace Rooberthh\Switchboard\Actions;
 
 use Illuminate\Support\Carbon;
 use Rooberthh\Switchboard\Exceptions\IllegalTransition;
@@ -27,7 +27,7 @@ use Throwable;
  *
  * @internal
  */
-final class RelayAction
+final class RelayInboxMessageAction
 {
     /**
      * @throws IllegalTransition when the message has already been relayed once

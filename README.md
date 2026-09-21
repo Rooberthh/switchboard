@@ -69,6 +69,7 @@ final class AcmeDriver extends StandardWebhooksDriver
         $payload = $request->json()->all();
 
         return new InboxMessageData(
+            provider: $this->provider(),
             eventId: (string) $request->header('webhook-id'),
             eventType: $payload['type'],
             data: $payload['data'],
@@ -181,6 +182,7 @@ final class StripeDriver extends HmacDriver
         $payload = $request->json()->all();
 
         return new InboxMessageData(
+            provider: $this->provider(),
             eventId: $payload['id'],
             eventType: $payload['type'],
             data: $payload['data']['object'] ?? [],

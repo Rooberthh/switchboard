@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Rooberthh\Switchboard\Actions\Inbox;
+namespace Rooberthh\Switchboard\Actions;
 
 use Illuminate\Support\Str;
 use Rooberthh\Switchboard\Events\InboxMessageFailed;
@@ -17,13 +17,13 @@ use Throwable;
  * failure without reproducing it, and bounded, so one pathological exception
  * cannot fill the column.
  *
- * Tolerant of a repeat for the same reason {@see ProcessAction} is — two jobs
+ * Tolerant of a repeat for the same reason {@see ProcessInboxMessageAction} is — two jobs
  * for one message can both spend their attempts — and the later error wins,
  * because it is the more recent diagnosis.
  *
  * @internal
  */
-final class FailAction
+final class FailInboxMessageAction
 {
     /**
      * Enough to diagnose the failure without reproducing it.

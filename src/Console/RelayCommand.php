@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
-use Rooberthh\Switchboard\Actions\Inbox\RelayAction;
+use Rooberthh\Switchboard\Actions\RelayInboxMessageAction;
 use Rooberthh\Switchboard\Inbox\InboxMessages;
 use Rooberthh\Switchboard\Inbox\Staleness;
 use Rooberthh\Switchboard\Models\InboxMessage;
@@ -70,7 +70,7 @@ final class RelayCommand extends Command
     private function relay(Builder $query): int
     {
         $relayed = 0;
-        $relay = app(RelayAction::class);
+        $relay = app(RelayInboxMessageAction::class);
 
         // Paged by id rather than by offset, like replay: the predicate this
         // pages through is one the sweep itself changes.

@@ -47,6 +47,7 @@ class StripeDriver extends HmacDriver
         $payload = $request->json()->all();
 
         return new InboxMessageData(
+            provider: $this->provider(),
             eventId: $payload['id'],
             eventType: $payload['type'],
             data: $payload['data']['object'] ?? [],

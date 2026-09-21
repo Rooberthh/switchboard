@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
-use Rooberthh\Switchboard\Actions\Inbox\ReplayAction;
+use Rooberthh\Switchboard\Actions\ReplayInboxMessageAction;
 use Rooberthh\Switchboard\Exceptions\IllegalTransition;
 use Rooberthh\Switchboard\Jobs\ProcessInboxMessage;
 
@@ -13,7 +13,7 @@ it('returns a failed message to unprocessed and queues it', function () {
 
     $message = inboxMessage(['failed_at' => now(), 'last_error' => 'an old error']);
 
-    app(ReplayAction::class)->execute($message);
+    app(ReplayInboxMessageAction::class)->execute($message);
 
     Queue::assertPushed(
         ProcessInboxMessage::class,
@@ -34,7 +34,7 @@ it('puts the failure back, diagnosis and all, when the queue will not take the j
     $failedAt = now()->subHour();
     $message = inboxMessage(['failed_at' => $failedAt, 'last_error' => 'an old error']);
 
-    expect(fn() => app(ReplayAction::class)->execute($message))->toThrow(Exception::class);
+    expect(fn() => app(ReplayInboxMessageAction::class)->execute($message))->toThrow(Exception::class);
 
     $message->refresh();
 
@@ -48,7 +48,7 @@ it('refuses to replay a message that succeeded', function () {
 
     $message = inboxMessage(['processed_at' => now()]);
 
-    expect(fn() => app(ReplayAction::class)->execute($message))->toThrow(IllegalTransition::class);
+    expect(fn() => app(ReplayInboxMessageAction::class)->execute($message))->toThrow(IllegalTransition::class);
 
     Queue::assertNothingPushed();
 
@@ -60,7 +60,7 @@ it('refuses to replay a message that is merely unprocessed', function () {
 
     $message = inboxMessage();
 
-    expect(fn() => app(ReplayAction::class)->execute($message))->toThrow(IllegalTransition::class);
+    expect(fn() => app(ReplayInboxMessageAction::class)->execute($message))->toThrow(IllegalTransition::class);
 
     Queue::assertNothingPushed();
 });

@@ -26,6 +26,7 @@ class AcmeStandardWebhooksDriver extends StandardWebhooksDriver
         $payload = $request->json()->all();
 
         return new InboxMessageData(
+            provider: $this->provider(),
             eventId: (string) $request->header('webhook-id'),
             eventType: (string) ($payload['type'] ?? 'unknown'),
             data: is_array($payload['data'] ?? null) ? $payload['data'] : [],

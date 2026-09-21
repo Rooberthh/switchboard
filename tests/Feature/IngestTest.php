@@ -109,7 +109,7 @@ it('deduplicates by recovering from the unique index, not by reading before writ
                 'updated_at' => now(),
             ]);
 
-            return new InboxMessageData(eventId: 'evt_1', eventType: 'invoice.paid');
+            return new InboxMessageData(provider: 'acme', eventId: 'evt_1', eventType: 'invoice.paid');
         }
     });
 
@@ -219,7 +219,7 @@ it('refuses a driver that supplies a blank event id rather than collapsing the d
         public function normalize(Request $request): InboxMessageData
         {
             // The header this driver reads its id from is not being sent.
-            return new InboxMessageData(eventId: '', eventType: 'invoice.paid');
+            return new InboxMessageData(provider: 'acme', eventId: '', eventType: 'invoice.paid');
         }
     });
 
@@ -231,6 +231,33 @@ it('refuses a driver that supplies a blank event id rather than collapsing the d
 });
 
 it('refuses a driver that supplies a blank event type', function () {
-    expect(fn() => new InboxMessageData(eventId: 'evt_1', eventType: ' '))
+    expect(fn() => new InboxMessageData(provider: 'acme', eventId: 'evt_1', eventType: ' '))
         ->toThrow(InvalidInboxMessage::class);
+});
+
+it('refuses a blank provider', function () {
+    expect(fn() => new InboxMessageData(provider: ' ', eventId: 'evt_1', eventType: 'invoice.paid'))
+        ->toThrow(InvalidInboxMessage::class);
+});
+
+it('refuses a driver that files a message under another provider, and persists nothing', function () {
+    Switchboard::extend('acme', new class implements Driver {
+        public function verify(Request $request): bool
+        {
+            return true;
+        }
+
+        public function normalize(Request $request): InboxMessageData
+        {
+            return new InboxMessageData(provider: 'stripe', eventId: 'evt_1', eventType: 'invoice.paid');
+        }
+    });
+
+    $this->withoutExceptionHandling();
+
+    expect(fn() => deliver())->toThrow(InvalidInboxMessage::class, '[acme]');
+
+    expect(InboxMessage::query()->count())->toBe(0);
+
+    Queue::assertNothingPushed();
 });

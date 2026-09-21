@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Rooberthh\Switchboard\Actions\Inbox;
+namespace Rooberthh\Switchboard\Actions;
 
 use Rooberthh\Switchboard\Events\InboxMessageProcessed;
 use Rooberthh\Switchboard\Exceptions\IllegalTransition;
@@ -22,7 +22,7 @@ use Rooberthh\Switchboard\Models\InboxMessage;
  *
  * @internal
  */
-final class ProcessAction
+final class ProcessInboxMessageAction
 {
     /**
      * @throws IllegalTransition when the message has already failed

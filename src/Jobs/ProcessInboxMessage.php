@@ -8,8 +8,8 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Rooberthh\Switchboard\Actions\Inbox\FailAction;
-use Rooberthh\Switchboard\Actions\Inbox\ProcessAction;
+use Rooberthh\Switchboard\Actions\FailInboxMessageAction;
+use Rooberthh\Switchboard\Actions\ProcessInboxMessageAction;
 use Rooberthh\Switchboard\Inbox\InboxMessages;
 use Rooberthh\Switchboard\Switchboard;
 use Throwable;
@@ -56,7 +56,7 @@ final class ProcessInboxMessage implements ShouldQueue
 
         Switchboard::handler($message->provider)->handle($message);
 
-        app(ProcessAction::class)->execute($message);
+        app(ProcessInboxMessageAction::class)->execute($message);
     }
 
     /**
@@ -75,6 +75,6 @@ final class ProcessInboxMessage implements ShouldQueue
             return;
         }
 
-        app(FailAction::class)->execute($message, $exception);
+        app(FailInboxMessageAction::class)->execute($message, $exception);
     }
 }

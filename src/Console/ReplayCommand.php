@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard\Console;
 
 use Illuminate\Console\Command;
-use Rooberthh\Switchboard\Actions\Inbox\ReplayAction;
+use Rooberthh\Switchboard\Actions\ReplayInboxMessageAction;
 use Rooberthh\Switchboard\Inbox\InboxMessages;
 use Rooberthh\Switchboard\Models\InboxMessage;
 
@@ -44,7 +44,7 @@ final class ReplayCommand extends Command
         }
 
         $replayed = 0;
-        $replay = app(ReplayAction::class);
+        $replay = app(ReplayInboxMessageAction::class);
 
         // Paged by id, not by offset: clearing failed_at removes the row from
         // this query, so offset paging would step over as many messages as it

@@ -15,7 +15,7 @@ beforeEach(function () {
     AcmeHandler::$calls = [];
 
     Switchboard::extend('acme', new FakeDriver());
-    Switchboard::extend('other', new FakeDriver());
+    Switchboard::extend('other', new FakeDriver(provider: 'other'));
     Switchboard::handledBy('acme', AcmeHandler::class);
     Switchboard::handledBy('other', AcmeHandler::class);
     Switchboard::route('acme');

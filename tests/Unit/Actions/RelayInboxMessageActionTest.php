@@ -6,7 +6,7 @@ use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
-use Rooberthh\Switchboard\Actions\Inbox\RelayAction;
+use Rooberthh\Switchboard\Actions\RelayInboxMessageAction;
 use Rooberthh\Switchboard\Exceptions\IllegalTransition;
 use Rooberthh\Switchboard\Jobs\ProcessInboxMessage;
 use Rooberthh\Switchboard\Models\InboxMessage;
@@ -17,7 +17,7 @@ it('marks the message relayed and queues it', function () {
 
     $message = inboxMessage();
 
-    app(RelayAction::class)->execute($message);
+    app(RelayInboxMessageAction::class)->execute($message);
 
     Queue::assertPushed(
         ProcessInboxMessage::class,
@@ -40,7 +40,7 @@ it('marks before it dispatches, so a run that dies partway cannot relay twice', 
         $markedWhenQueued = InboxMessage::query()->find($message->id)?->relayed_at;
     });
 
-    app(RelayAction::class)->execute($message);
+    app(RelayInboxMessageAction::class)->execute($message);
 
     expect($markedWhenQueued)->not->toBeNull();
 });
@@ -53,7 +53,7 @@ it('puts the mark back when the queue will not take the job', function () {
 
     $message = inboxMessage();
 
-    expect(fn() => app(RelayAction::class)->execute($message))->toThrow(Exception::class);
+    expect(fn() => app(RelayInboxMessageAction::class)->execute($message))->toThrow(Exception::class);
 
     expect($message->refresh()->relayed_at)->toBeNull();
 });
@@ -63,7 +63,7 @@ it('refuses to relay a message a sweep has already relayed', function () {
 
     $message = inboxMessage(['relayed_at' => now()->subHour()]);
 
-    expect(fn() => app(RelayAction::class)->execute($message))->toThrow(IllegalTransition::class);
+    expect(fn() => app(RelayInboxMessageAction::class)->execute($message))->toThrow(IllegalTransition::class);
 
     Queue::assertNothingPushed();
 });
@@ -73,7 +73,7 @@ it('leaves the message unprocessed, because relaying is not a lifecycle step', f
 
     $message = inboxMessage();
 
-    app(RelayAction::class)->execute($message);
+    app(RelayInboxMessageAction::class)->execute($message);
 
     expect($message->refresh()->isUnprocessed())->toBeTrue();
 });

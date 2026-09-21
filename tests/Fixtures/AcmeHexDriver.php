@@ -45,6 +45,7 @@ class AcmeHexDriver extends HmacDriver
         $payload = $request->json()->all();
 
         return new InboxMessageData(
+            provider: $this->provider(),
             eventId: (string) $payload['id'],
             eventType: (string) $payload['type'],
         );

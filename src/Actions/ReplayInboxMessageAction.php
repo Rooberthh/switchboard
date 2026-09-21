@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Rooberthh\Switchboard\Actions\Inbox;
+namespace Rooberthh\Switchboard\Actions;
 
 use Rooberthh\Switchboard\Exceptions\IllegalTransition;
 use Rooberthh\Switchboard\Jobs\ProcessInboxMessage;
@@ -25,7 +25,7 @@ use Throwable;
  *
  * @internal
  */
-final class ReplayAction
+final class ReplayInboxMessageAction
 {
     /**
      * @throws IllegalTransition when the message has not failed
