@@ -78,10 +78,18 @@ return [
     | Switchboard::emit() holds. Within it, the same key returns the first
     | message; after it, the key is free again.
     |
+    | "timeout" is how many seconds a delivery waits for the endpoint.
+    |
+    | "lease" is how long a queued delivery is left alone by the relay before
+    | its job is presumed lost and it is queued again. Keep it comfortably
+    | longer than "timeout" plus the time a job waits on your queue.
+    |
     */
 
     'outbox' => [
         'idempotency_window' => 86400,
+        'timeout' => 15,
+        'lease' => 300,
     ],
 
     /*

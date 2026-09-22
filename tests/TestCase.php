@@ -38,6 +38,8 @@ abstract class TestCase extends BaseTestCase
 
     protected function defineEnvironment($app): void
     {
+        // Endpoint secrets are encrypted at rest.
+        $app['config']->set('app.key', 'base64:' . base64_encode(str_repeat('s', 32)));
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', [
             'driver' => 'sqlite',

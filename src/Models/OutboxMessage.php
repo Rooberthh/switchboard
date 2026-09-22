@@ -6,6 +6,7 @@ namespace Rooberthh\Switchboard\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -47,6 +48,14 @@ class OutboxMessage extends Model
             'payload' => 'array',
             'relayed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @return HasMany<Delivery, $this>
+     */
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(Delivery::class, 'outbox_message_id');
     }
 
     /**
