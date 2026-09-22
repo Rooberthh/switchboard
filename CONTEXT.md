@@ -13,14 +13,14 @@ A webhook event that Switchboard has persisted, in either direction. Every messa
 
 **Event type**:
 The dotted name for what happened, such as `invoice.paid`.
-_Avoid_: event name, topic, trigger
+_Avoid_: event name, topic, trigger, key
 
 **Event ID**:
-The identifier that makes a message idempotent: the provider's own id on the inbox, and the message's own id on the outbox, sent as `webhook-id`.
-_Avoid_: idempotency key, external id
+The identifier that makes a message idempotent: the provider's own id on the inbox, and on the outbox an id Switchboard generates when the message is emitted, sent as `webhook-id`. An application never chooses an outbox event ID; to make emitting idempotent it passes an idempotency key instead.
+_Avoid_: external id
 
 **Relay**:
-The scheduled sweep that finds messages or deliveries which are due but were never queued, and queues them. It is what makes processing and delivery at-least-once rather than best-effort. Relaying is not a lifecycle step: a relayed inbox message is still unprocessed.
+The scheduled sweep that queues whatever is due on the outbox: it turns each committed message not yet relayed into one delivery per endpoint subscribed to its event type, and it queues every delivery whose next attempt has come. It is the only way a message reaches an endpoint, and each application schedules it itself. The inbox's recovery sweep for lost processing jobs currently shares the name.
 _Avoid_: sweeper, cron, reaper
 
 **Stale**:
@@ -64,11 +64,23 @@ _Avoid_: backfill, catch-up, sync
 ### Outbox
 
 **Outbox message**:
-An outbound webhook, persisted inside the caller's database transaction. It records what happened once, independently of who it goes to.
-_Avoid_: event, notification, payload
+An outbound webhook: an event type and its payload, persisted when it is emitted — inside the caller's database transaction if there is one, so the application decides whether it is atomic with its own writes. It records what happened once, independently of who it goes to.
+_Avoid_: event, notification
+
+**Payload**:
+What an application emits alongside an event type: the contents of an outbox message. It travels inside the envelope, never on its own.
+_Avoid_: data, body
+
+**Envelope**:
+The Standard Webhooks JSON shape every outbox message is sent in: its event type, when it was emitted, and its payload. Every receiver gets the same envelope.
+_Avoid_: wrapper, body, format
+
+**Idempotency key**:
+An optional key an application passes when it emits, such as `invoice.paid:inv_123`. Emitting again with the same key within 24 hours writes nothing and returns the message the first emit wrote; after that, the key is free again. Without one, every emit is a new message.
+_Avoid_: key, dedupe key, message key
 
 **Endpoint**:
-A URL that receives outbound messages, together with the event patterns it wants.
+A URL that receives outbound messages, together with the exact event types it subscribes to. There are no wildcards: an endpoint that wants a new event type subscribes to it by name. An endpoint whose receiver answers `410 Gone` is disabled and receives nothing further.
 _Avoid_: subscription, destination, receiver, webhook
 
 **Delivery**:
@@ -76,7 +88,7 @@ One endpoint's copy of one outbox message, and the record of the attempts to del
 _Avoid_: attempt, call, log entry
 
 **Emit**:
-To write an outbox message and its deliveries, inside whatever transaction the caller is already in. Emitting never performs HTTP.
+To write an outbox message: one row, inside whatever transaction the caller is already in. Emitting never creates deliveries and never performs HTTP; both happen afterwards, once the message is committed.
 _Avoid_: send, dispatch, fire, publish
 
 **Replay**:

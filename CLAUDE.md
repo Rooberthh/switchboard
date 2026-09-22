@@ -24,7 +24,7 @@ Supported: PHP ^8.4, Laravel 13 only.
 - An integration is **one provider class** (`Inbox\WebhookProvider`): name, verification, normalization and the event-type → handler map. See ADR-0005.
 - Verification is delegated to the `Verification` class a provider returns. The package ships `StandardWebhooks` but **never holds a secret** and ships no provider classes. See ADR-0001.
 - Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature`, signing `id.timestamp.body`, base64) is the outbox's signing scheme, and is available inbound to any driver that wants it.
-- The outbox is a **transactional outbox**. `emit()` writes rows inside the caller's DB transaction, jobs dispatch `afterCommit`, and a relay sweeper gives at-least-once delivery.
+- The outbox is a **transactional outbox**. `emit()` writes one row, inside the caller's DB transaction if there is one, and nothing else. A scheduled relay, the only path to an endpoint, turns messages into deliveries and queues what is due, giving at-least-once delivery. See ADR-0006 and ADR-0007.
 
 ## Extension points (integration-first)
 

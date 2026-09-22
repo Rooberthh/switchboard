@@ -71,6 +71,41 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Outbox
+    |--------------------------------------------------------------------------
+    |
+    | "idempotency_window" is how many seconds an idempotency key passed to
+    | Switchboard::emit() holds. Within it, the same key returns the first
+    | message; after it, the key is free again.
+    |
+    | "timeout" is how many seconds a delivery waits for the endpoint.
+    |
+    | "retry_schedule" is how many seconds to wait after each failed attempt,
+    | so a delivery gets one more attempt than it has entries. The default is
+    | the Standard Webhooks example: ten attempts over about three days. Each
+    | wait is stretched by up to ten percent at random.
+    |
+    | "lease" is how long a queued delivery is left alone by the relay before
+    | its job is presumed lost and it is queued again. Keep it comfortably
+    | longer than "timeout" plus the time a job waits on your queue.
+    |
+    | "allowed_hosts" are hosts delivered to even though they resolve to a
+    | private or reserved address. Everything else must resolve to the public
+    | internet, because an endpoint's URL is usually someone else's input.
+    | Add "localhost" here for local development, never in production.
+    |
+    */
+
+    'outbox' => [
+        'idempotency_window' => 86400,
+        'timeout' => 15,
+        'retry_schedule' => [5, 300, 1800, 7200, 18000, 36000, 50400, 72000, 86400],
+        'lease' => 300,
+        'allowed_hosts' => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Providers
     |--------------------------------------------------------------------------
     |

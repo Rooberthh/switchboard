@@ -6,6 +6,7 @@ namespace Rooberthh\Switchboard\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Orchestra\Testbench\TestCase as BaseTestCase;
+use Rooberthh\Switchboard\Support\SsrfGuard;
 use Rooberthh\Switchboard\Switchboard;
 use Rooberthh\Switchboard\SwitchboardServiceProvider;
 
@@ -15,11 +16,20 @@ abstract class TestCase extends BaseTestCase
 {
     use RefreshDatabase;
 
+    /**
+     * A globally routable address hosts resolve to in tests.
+     */
+    public const PUBLIC_ADDRESS = '93.184.215.14';
+
     protected function setUp(): void
     {
         parent::setUp();
 
         Switchboard::flush();
+
+        // No test touches real DNS: every host resolves to one public address
+        // unless a test says otherwise.
+        $this->app->instance(SsrfGuard::class, new SsrfGuard(fn(string $host): array => [self::PUBLIC_ADDRESS]));
     }
 
     protected function tearDown(): void
@@ -38,6 +48,8 @@ abstract class TestCase extends BaseTestCase
 
     protected function defineEnvironment($app): void
     {
+        // Endpoint secrets are encrypted at rest.
+        $app['config']->set('app.key', 'base64:' . base64_encode(str_repeat('s', 32)));
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', [
             'driver' => 'sqlite',
