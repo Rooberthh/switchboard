@@ -494,6 +494,61 @@ InboxMessage::query()->relayed()->unprocessed()->count();
 Relaying is not a lifecycle step: a relayed message is still **unprocessed**
 until a handler says otherwise.
 
+## Sending webhooks
+
+### Keeping endpoints in your own storage
+
+Endpoints live in Switchboard's `switchboard_endpoints` table by default.
+If your application already stores its customers' webhook URLs — its own
+table, one per tenant, an external service — bind your own implementation of
+`Contracts\Endpoints` instead. It has three methods:
+
+```php
+use Rooberthh\Switchboard\Contracts\Endpoints;
+use Rooberthh\Switchboard\Outbox\EndpointData;
+
+final class TenantEndpoints implements Endpoints
+{
+    /** Active endpoints subscribed to exactly this event type. */
+    public function subscribedTo(string $eventType): iterable
+    {
+        return WebhookUrl::query()
+            ->whereNull('disabled_at')
+            ->whereJsonContains('events', $eventType)
+            ->lazy()
+            ->map(fn (WebhookUrl $url) => new EndpointData(
+                id: (string) $url->id,
+                url: $url->url,
+                secret: $url->signing_secret,
+            ));
+    }
+
+    /** One active endpoint, or null when it is gone or disabled. */
+    public function find(string $id): ?EndpointData
+    {
+        $url = WebhookUrl::query()->whereNull('disabled_at')->find($id);
+
+        return $url ? new EndpointData((string) $url->id, $url->url, $url->signing_secret) : null;
+    }
+
+    /** Its receiver answered 410 Gone. */
+    public function disable(string $id): void
+    {
+        WebhookUrl::query()->whereKey($id)->update(['disabled_at' => now()]);
+    }
+}
+```
+
+```php
+// AppServiceProvider::register()
+$this->app->bind(Endpoints::class, TenantEndpoints::class);
+```
+
+The id is recorded on every delivery as a string, with no foreign key, so it
+can be anything stable. Secrets must be Standard Webhooks secrets: `whsec_`
+and base64. To keep an existing secret on Switchboard's own table, pass it
+when creating the endpoint; otherwise one is generated.
+
 ## Configuration
 
 `config/switchboard.php` holds **data only**. Behaviour lives in your provider
