@@ -10,10 +10,12 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Rooberthh\Switchboard\Contracts\Endpoints;
+use Rooberthh\Switchboard\Events\OutboxDeliveryFailed;
 use Rooberthh\Switchboard\Events\OutboxDeliverySucceeded;
 use Rooberthh\Switchboard\Exceptions\UnsafeEndpoint;
 use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\Outbox\EndpointData;
+use Rooberthh\Switchboard\Support\RetrySchedule;
 use Rooberthh\Switchboard\Support\SsrfGuard;
 use Rooberthh\Switchboard\Support\StandardWebhooksSignature;
 
@@ -34,6 +36,7 @@ final class AttemptDeliveryAction
     public function __construct(
         private readonly Endpoints $endpoints,
         private readonly SsrfGuard $guard,
+        private readonly RetrySchedule $schedule,
     ) {}
 
     public function execute(Delivery $delivery): void
@@ -51,7 +54,7 @@ final class AttemptDeliveryAction
         try {
             $response = $this->send($delivery, $endpoint);
         } catch (UnsafeEndpoint|ConnectionException $e) {
-            $this->fail($delivery, null, $e->getMessage());
+            $this->retry($delivery, null, $e->getMessage());
 
             return;
         }
@@ -62,7 +65,12 @@ final class AttemptDeliveryAction
             return;
         }
 
-        $this->fail($delivery, $response->status(), "The endpoint answered {$response->status()}.");
+        $this->retry(
+            $delivery,
+            $response->status(),
+            "The endpoint answered {$response->status()}.",
+            self::retryAfter($response),
+        );
     }
 
     private function send(Delivery $delivery, EndpointData $endpoint): Response
@@ -102,6 +110,32 @@ final class AttemptDeliveryAction
         event(new OutboxDeliverySucceeded($delivery));
     }
 
+    /**
+     * A failed attempt: try again on the schedule, or fail for good once it
+     * is spent.
+     *
+     * @param Delivery $delivery
+     * @param int|null $status
+     * @param string $error
+     * @param int|null $retryAfter
+     */
+    private function retry(Delivery $delivery, ?int $status, string $error, ?int $retryAfter = null): void
+    {
+        $next = $this->schedule->next($delivery->attempts, $retryAfter);
+
+        if ($next === null) {
+            $this->fail($delivery, $status, $error);
+
+            return;
+        }
+
+        $delivery->forceFill([
+            'next_attempt_at' => $next,
+            'last_status' => $status,
+            'last_error' => Str::limit($error, self::ERROR_LIMIT),
+        ])->save();
+    }
+
     private function fail(Delivery $delivery, ?int $status, string $error): void
     {
         $delivery->forceFill([
@@ -110,6 +144,36 @@ final class AttemptDeliveryAction
             'last_status' => $status,
             'last_error' => Str::limit($error, self::ERROR_LIMIT),
         ])->save();
+
+        event(new OutboxDeliveryFailed($delivery));
+    }
+
+    /**
+     * The wait a throttled or overloaded receiver asked for, in seconds, as
+     * a number or an HTTP date. Only 429, 502 and 504 are read: those are
+     * the answers Standard Webhooks says to throttle on.
+     *
+     * @param Response $response
+     */
+    private static function retryAfter(Response $response): ?int
+    {
+        if (! in_array($response->status(), [429, 502, 504], true)) {
+            return null;
+        }
+
+        $header = trim($response->header('Retry-After'));
+
+        if ($header === '') {
+            return null;
+        }
+
+        if (ctype_digit($header)) {
+            return (int) $header;
+        }
+
+        $at = strtotime($header);
+
+        return $at === false ? null : max(0, $at - Carbon::now()->getTimestamp());
     }
 
     private static function timeout(): int
