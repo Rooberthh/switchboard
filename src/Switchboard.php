@@ -101,12 +101,20 @@ final class Switchboard
      * nothing — the scheduled relay turns it into deliveries once it has
      * committed.
      *
+     * Pass an idempotency key, such as "invoice.paid:inv_123", to make
+     * emitting idempotent: the same key within the idempotency window (24
+     * hours by default) returns the first message rather than writing a
+     * second, and throws if the event type or payload differ.
+     *
      * @param  array<string, mixed>  $payload
      * @param  string  $eventType
+     * @param  string|null  $idempotencyKey
+     *
+     * @throws Exceptions\InvalidOutboxMessage
      */
-    public static function emit(string $eventType, array $payload = []): OutboxMessage
+    public static function emit(string $eventType, array $payload = [], ?string $idempotencyKey = null): OutboxMessage
     {
-        return app(EmitOutboxMessageAction::class)->execute($eventType, $payload);
+        return app(EmitOutboxMessageAction::class)->execute($eventType, $payload, $idempotencyKey);
     }
 
     /**

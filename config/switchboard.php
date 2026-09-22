@@ -71,6 +71,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Outbox
+    |--------------------------------------------------------------------------
+    |
+    | "idempotency_window" is how many seconds an idempotency key passed to
+    | Switchboard::emit() holds. Within it, the same key returns the first
+    | message; after it, the key is free again.
+    |
+    */
+
+    'outbox' => [
+        'idempotency_window' => 86400,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Providers
     |--------------------------------------------------------------------------
     |
