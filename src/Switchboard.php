@@ -6,15 +6,18 @@ namespace Rooberthh\Switchboard;
 
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as RouteFacade;
+use Rooberthh\Switchboard\Actions\EmitOutboxMessageAction;
 use Rooberthh\Switchboard\Contracts\WebhookProvider;
 use Rooberthh\Switchboard\Exceptions\InvalidProvider;
 use Rooberthh\Switchboard\Exceptions\UnknownProvider;
 use Rooberthh\Switchboard\Http\Controllers\InboxController;
+use Rooberthh\Switchboard\Models\OutboxMessage;
 
 /**
- * Switchboard's entry point, called from a service provider's boot method.
- * Configuration holds data; a provider class holds behaviour; this class is
- * where a provider class is registered. There is deliberately no facade.
+ * Switchboard's entry point. Providers are registered here from a service
+ * provider's boot method, and outbox messages are emitted here. Configuration
+ * holds data; a provider class holds behaviour. There is deliberately no
+ * facade.
  *
  * Public API.
  */
@@ -87,6 +90,23 @@ final class Switchboard
     public static function providers(): array
     {
         return array_keys(self::$providers);
+    }
+
+    /**
+     * Emit an outbox message: write it, and nothing else.
+     *
+     * Call it inside the transaction that makes the event true, and the
+     * message commits or rolls back with your own writes; call it outside one
+     * and it commits on its own. Either way it performs no HTTP and queues
+     * nothing — the scheduled relay turns it into deliveries once it has
+     * committed.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  string  $eventType
+     */
+    public static function emit(string $eventType, array $payload = []): OutboxMessage
+    {
+        return app(EmitOutboxMessageAction::class)->execute($eventType, $payload);
     }
 
     /**
