@@ -9,6 +9,7 @@ use Rooberthh\Switchboard\Contracts\Endpoints;
 use Rooberthh\Switchboard\Outbox\DatabaseEndpoints;
 use Rooberthh\Switchboard\Console\MakeWebhookProviderCommand;
 use Rooberthh\Switchboard\Console\OutboxRelayCommand;
+use Rooberthh\Switchboard\Console\OutboxReplayCommand;
 use Rooberthh\Switchboard\Console\RelayCommand;
 use Rooberthh\Switchboard\Console\ReplayCommand;
 
@@ -28,6 +29,7 @@ class SwitchboardServiceProvider extends ServiceProvider
             $this->commands([
                 MakeWebhookProviderCommand::class,
                 OutboxRelayCommand::class,
+                OutboxReplayCommand::class,
                 RelayCommand::class,
                 ReplayCommand::class,
             ]);

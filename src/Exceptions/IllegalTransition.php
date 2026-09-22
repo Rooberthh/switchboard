@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard\Exceptions;
 
 use LogicException;
+use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\Models\InboxMessage;
 
 /**
@@ -46,6 +47,14 @@ final class IllegalTransition extends LogicException
         return new self(
             "Inbox message [{$message->id}] has not failed, so there is nothing to replay. "
             . 'Re-running a message that succeeded would repeat side effects the application already performed.',
+        );
+    }
+
+    public static function deliveryNotFailed(Delivery $delivery): self
+    {
+        return new self(
+            "Delivery [{$delivery->id}] has not failed, so there is nothing to replay. "
+            . 'Only a failed delivery can be replayed: sending a delivered one again would repeat what its receiver already has.',
         );
     }
 }
