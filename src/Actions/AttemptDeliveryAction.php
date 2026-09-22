@@ -10,6 +10,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Rooberthh\Switchboard\Contracts\Endpoints;
+use Rooberthh\Switchboard\Events\EndpointDisabled;
 use Rooberthh\Switchboard\Events\OutboxDeliveryFailed;
 use Rooberthh\Switchboard\Events\OutboxDeliverySucceeded;
 use Rooberthh\Switchboard\Exceptions\UnsafeEndpoint;
@@ -61,6 +62,18 @@ final class AttemptDeliveryAction
 
         if ($response->successful()) {
             $this->succeed($delivery, $response->status());
+
+            return;
+        }
+
+        // The receiver says the endpoint is gone: stop sending to it at all,
+        // rather than spending three days of retries finding out.
+        if ($response->status() === 410) {
+            $this->endpoints->disable($endpoint->id);
+
+            event(new EndpointDisabled($endpoint));
+
+            $this->fail($delivery, 410, 'The endpoint answered 410 Gone and has been disabled.');
 
             return;
         }
