@@ -3,14 +3,13 @@
 An inbox and outbox for webhooks in Laravel.
 
 - **Inbox:** receive webhooks that are verified, deduplicated by event ID, stored, and processed on the queue. Anything that failed can be replayed.
-- **Outbox:** emit webhooks inside your own database transaction, signed with [Standard Webhooks](https://www.standardwebhooks.com/) and delivered with retries. *Arrives in 0.2.0.*
+- **Outbox:** emit webhooks inside your own database transaction, signed with [Standard Webhooks](https://www.standardwebhooks.com/) and delivered at least once, with retries over days.
 
 Both directions share one message lifecycle and one signing scheme. An
 integration is one provider class; everything a platform needs to make its own —
 verification, handlers, secrets, routing, queues — is an extension point.
 
-> **This release (0.1.0) is the inbox and a way to consume it.** The outbox
-> follows in 0.2.0.
+> **0.2.0 adds the outbox.** 0.1.0 was the inbox and a way to consume it.
 
 ## Why
 
@@ -496,6 +495,161 @@ until a handler says otherwise.
 
 ## Sending webhooks
 
+The outbox is the other half: your application **emits** a message, and
+Switchboard delivers it to every **endpoint** subscribed to its event type,
+signed with Standard Webhooks, retried for days, and never to your own network.
+
+### Quickstart
+
+**1. Schedule the relay.** Do this first: the relay is the only thing that
+turns emitted messages into deliveries, and **an outbox nobody relays sends
+nothing**.
+
+```php
+// routes/console.php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('switchboard:outbox:relay')->everyMinute()->withoutOverlapping();
+```
+
+Run a queue worker too; each delivery attempt is a queued job.
+
+**2. Create an endpoint.** Usually from a settings screen where your customer
+enters their URL:
+
+```php
+use Rooberthh\Switchboard\Models\Endpoint;
+
+$endpoint = Endpoint::query()->create([
+    'url' => 'https://customer.example/webhooks',
+    'event_types' => ['invoice.paid', 'invoice.voided'],
+]);
+
+$endpoint->secret; // whsec_... — generated, stored encrypted. Show it to the customer once.
+```
+
+Endpoints subscribe to exact event types. There are no wildcards.
+
+**3. Emit.** Inside the transaction that makes the event true:
+
+```php
+use Rooberthh\Switchboard\Switchboard;
+
+DB::transaction(function () use ($invoice) {
+    $invoice->markPaid();
+
+    Switchboard::emit('invoice.paid', [
+        'invoice' => $invoice->public_id,
+        'amount' => $invoice->amount,
+    ]);
+});
+```
+
+Within a minute the relay creates a delivery to every subscribed endpoint and
+queues it.
+
+### Emitting
+
+`Switchboard::emit($eventType, $payload)` writes **one row** and does nothing
+else — no endpoints are looked up, no job is queued, no HTTP is performed. So
+**you decide whether it is atomic**: emit inside `DB::transaction()` and the
+message commits or rolls back with your own writes, so a rolled-back change is
+never announced; emit outside one and it commits on its own.
+
+Switchboard generates the message's event ID, a UUIDv7 sent to receivers as
+`webhook-id`, and renders the envelope every receiver gets, once, at emit:
+
+```json
+{"type":"invoice.paid","timestamp":"2026-09-22T10:00:00.000000Z","data":{"invoice":"inv_123","amount":1000}}
+```
+
+That exact body is stored and sent to every endpoint on every attempt, so a
+signature always covers the same bytes and a later code change never alters a
+message already emitted (`docs/adr/0006-the-outbox-stores-the-rendered-body.md`).
+
+### Idempotency keys
+
+Emitting twice makes two messages. When the code that emits can run twice — a
+queued job that is retried after it committed — pass an idempotency key:
+
+```php
+Switchboard::emit('invoice.paid', $payload, idempotencyKey: "invoice.paid:{$invoice->id}");
+```
+
+The same key within 24 hours returns the first message and writes nothing.
+Reusing it with a different event type or payload throws, because silently
+returning the first message would drop the second. After 24 hours the key is
+free again (`outbox.idempotency_window`).
+
+### Delivery and retries
+
+Each attempt sends the stored body with `webhook-id`, `webhook-timestamp` and
+`webhook-signature`, signed with the endpoint's current secret — so rotating a
+leaked secret takes effect on the next attempt. The URL is fixed when the
+delivery is created.
+
+| Answer | What happens |
+| --- | --- |
+| `2xx` | Delivered. |
+| `3xx` | A failure. The redirect is **never followed**. |
+| `410 Gone` | The endpoint is **disabled** and receives nothing further. |
+| `429`, `502`, `504` | Retried, honouring `Retry-After` when it asks for longer. |
+| Anything else, or a timeout | Retried. |
+
+Failures are retried on the Standard Webhooks schedule — **ten attempts over
+about three days**: immediately, then after 5 seconds, 5 and 30 minutes, and
+2, 5, 10, 14, 20 and 24 hours, each stretched a little at random. The waits
+live on the delivery, not on your queue, so they survive a queue outage and
+work on SQS (`docs/adr/0007-the-outbox-relay-is-the-only-path-to-an-endpoint.md`).
+When the schedule is spent the delivery is marked failed; the endpoint keeps
+receiving new messages.
+
+**Delivery is at-least-once, and unordered.** A receiver may see a message
+twice — it should deduplicate on `webhook-id` — and may see `invoice.paid`
+before `invoice.created` when the first attempt of one failed. Order by the
+envelope's `timestamp`, never by arrival.
+
+### Endpoints are someone else's input
+
+Every attempt resolves the endpoint's host, refuses it unless every address it
+resolves to is on the public internet — private ranges, loopback, link-local and
+cloud metadata, carrier-grade NAT and the rest — and connects to the address it
+checked, so DNS rebinding cannot slip past. Only `http` and `https` are
+delivered to.
+
+For local development or a genuinely internal receiver, allow its host
+explicitly:
+
+```php
+// config/switchboard.php
+'outbox' => [
+    'allowed_hosts' => ['localhost'],
+],
+```
+
+### Replay
+
+Once a receiver has fixed its side, send its failed deliveries again:
+
+```bash
+php artisan switchboard:outbox:replay
+php artisan switchboard:outbox:replay --endpoint=42
+```
+
+Replayed deliveries are due at once and the relay sends them on its next run —
+the same body to the same URL, with the retry schedule started over.
+
+### Outbox events
+
+| Event | Fired when |
+| --- | --- |
+| `OutboxMessageEmitted` | A message was emitted and committed. |
+| `OutboxDeliverySucceeded` | An endpoint answered `2xx`. |
+| `OutboxDeliveryFailed` | A delivery failed for good: its attempts are spent, or its endpoint is gone. The one to tell your customer about. |
+| `EndpointDisabled` | An endpoint answered `410 Gone`. |
+
+All are dispatched after commit, and there is no event per failed attempt.
+
 ### Keeping endpoints in your own storage
 
 Endpoints live in Switchboard's `switchboard_endpoints` table by default.
@@ -556,14 +710,19 @@ classes, registered through the static `Switchboard` class.
 
 | Key | What it does |
 | --- | --- |
-| `tables.inbox_messages` | Table name, if `switchboard_inbox_messages` collides with your schema. |
-| `queue.connection`, `queue.name` | Where processing jobs go. `null` uses your defaults. |
+| `tables.*` | Table names, if the defaults collide with your schema. |
+| `queue.connection`, `queue.name` | Where processing jobs and delivery attempts go. `null` uses your defaults. |
 | `inbox.path` | Prefix for the conventional endpoint. Default `webhooks`. |
 | `inbox.tolerance` | Seconds either side of now a signed timestamp may be. Default `300`, and symmetric: too old and too far in the future are both rejected. |
 | `inbox.tries` | Attempts a handler gets before the message is recorded as failed. |
 | `inbox.backoff` | Seconds between attempts. Exponential by default. |
 | `inbox.stale_after` | Seconds a message may be unprocessed before `switchboard:relay` treats its job as lost. `null` derives it from the two rows above and your queue's `retry_after`. |
 | `providers.{name}.secret` | Where a provider's `secret()` reads from by default. Switchboard itself never reads it. |
+| `outbox.idempotency_window` | Seconds an idempotency key holds. Default `86400`. |
+| `outbox.timeout` | Seconds a delivery waits for the endpoint. Default `15`. |
+| `outbox.retry_schedule` | Seconds to wait after each failed attempt. Default: the Standard Webhooks schedule, ten attempts over about three days. |
+| `outbox.lease` | Seconds a queued delivery is left alone before its job is presumed lost and it is queued again. Default `300`. |
+| `outbox.allowed_hosts` | Hosts delivered to even though they resolve to a private address. Default none. |
 
 Configuration mistakes are loud rather than quiet: a secret that cannot be
 decoded, or a provider that supplies a blank event id, throws instead of turning
@@ -577,14 +736,16 @@ Switchboard follows semantic versioning. What that covers:
 | --- | --- | --- |
 | `Contracts\WebhookProvider` | Contract | **Adding a method is a breaking change.** Deliberately larger than the other contracts, so an integration reads as one class (`docs/adr/0005-a-provider-is-one-class.md`). New information travels in `InboxMessageData` instead, as an optional constructor argument. |
 | `Contracts\Verification` | Contract | One method, and kept that way. |
+| `Contracts\Endpoints` | Contract | Three methods, and kept that way. `Outbox\EndpointData` is what it hands out, and grows by optional constructor arguments. |
 | `Inbox\WebhookProvider` | Base class | Meant to be extended. Its methods are the seams and change only on a major version. |
 | `Verification\StandardWebhooks` | Verification | The shipped signature scheme. `final`: another scheme is another `Verification`. |
 | `Inbox\InboxMessageData` | Data object | Grows by appending optional constructor arguments. |
-| `Switchboard` | Static entry point | `provider()`, `resolve()`, `providers()`. Providers are registered here, never through a facade — there is none. |
+| `Switchboard` | Static entry point | `provider()`, `resolve()`, `providers()`, `emit()`. Providers are registered and messages emitted here, never through a facade — there is none. |
 | `Events\*` | Events | Observation points. They carry the message and will keep carrying it. |
 | `Models\InboxMessage` | Model | Deliberately not `final`; an application may extend it. Nothing in the package names it except one internal resolver, so a model-swap configurator stays a one-line addition. |
+| `Models\OutboxMessage`, `Models\Endpoint`, `Models\Delivery` | Models | Deliberately not `final`. |
 | `config/switchboard.php` | Configuration | Data only: table names, queues, tolerances, retries. |
-| `Actions\*`, `Http\*`, `Jobs\*`, `Console\*`, `Inbox\InboxMessages`, `Inbox\Staleness` | **Internal** | `final` and `@internal`. Swap behaviour through a seam above, never by subclassing these. They change without a major version. |
+| `Actions\*`, `Http\*`, `Jobs\*`, `Console\*`, `Support\*`, `Inbox\InboxMessages`, `Inbox\Staleness`, `Outbox\DatabaseEndpoints` | **Internal** | `final` and `@internal`. Swap behaviour through a seam above, never by subclassing these. They change without a major version. |
 
 A test asserts this boundary, so it cannot drift silently.
 
@@ -598,10 +759,14 @@ A test asserts this boundary, so it cannot drift silently.
   (`docs/adr/0003-inbox-messages-are-normalized-records.md`).
 - **It does not reconcile against a provider's API.** That would require calling
   a provider, reintroducing exactly the coupling this package removes.
-- **It does not send webhooks yet.** The outbox — a transactional `emit()`,
-  endpoints, deliveries, signed delivery with backoff and an SSRF guard — arrives
-  in 0.2.0. The message lifecycle and signing scheme here are designed for both
-  directions already (`docs/adr/0002-inbox-first-shared-core-for-both-directions.md`).
+- **It promises no delivery order.** Receivers order by the envelope's
+  timestamp. Holding back an endpoint's queue behind one failing message would
+  let a single bad delivery block a customer for days.
+- **It does not backfill.** A new endpoint receives what is emitted after it
+  subscribes; it is not sent the history.
+- **It does not rotate endpoint secrets with overlap yet.** Replacing a secret
+  takes effect on the next attempt; signing with old and new together, as
+  Standard Webhooks allows, is planned.
 
 ## Development
 
