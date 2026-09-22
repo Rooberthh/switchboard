@@ -11,8 +11,10 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Rooberthh\Switchboard\Contracts\Endpoints;
 use Rooberthh\Switchboard\Events\OutboxDeliverySucceeded;
+use Rooberthh\Switchboard\Exceptions\UnsafeEndpoint;
 use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\Outbox\EndpointData;
+use Rooberthh\Switchboard\Support\SsrfGuard;
 use Rooberthh\Switchboard\Support\StandardWebhooksSignature;
 
 /**
@@ -20,7 +22,8 @@ use Rooberthh\Switchboard\Support\StandardWebhooksSignature;
  *
  * The body is the message's stored body, byte for byte (ADR-0006). It is
  * signed with Standard Webhooks, the attempt's own timestamp and the
- * endpoint's current secret, and sent to the URL snapshotted on the delivery.
+ * endpoint's current secret, and sent to the URL snapshotted on the delivery —
+ * only once the SSRF guard has decided where that URL may connect.
  *
  * @internal
  */
@@ -28,7 +31,10 @@ final class AttemptDeliveryAction
 {
     private const ERROR_LIMIT = 2000;
 
-    public function __construct(private readonly Endpoints $endpoints) {}
+    public function __construct(
+        private readonly Endpoints $endpoints,
+        private readonly SsrfGuard $guard,
+    ) {}
 
     public function execute(Delivery $delivery): void
     {
@@ -44,7 +50,7 @@ final class AttemptDeliveryAction
 
         try {
             $response = $this->send($delivery, $endpoint);
-        } catch (ConnectionException $e) {
+        } catch (UnsafeEndpoint|ConnectionException $e) {
             $this->fail($delivery, null, $e->getMessage());
 
             return;
@@ -61,11 +67,14 @@ final class AttemptDeliveryAction
 
     private function send(Delivery $delivery, EndpointData $endpoint): Response
     {
+        // Before anything is signed or sent: where this may connect, pinned.
+        $options = $this->guard->options($delivery->url);
+
         $message = $delivery->message;
         $timestamp = Carbon::now()->getTimestamp();
 
         return Http::timeout(self::timeout())
-            ->withOptions(['allow_redirects' => false])
+            ->withOptions($options)
             ->withUserAgent('Switchboard')
             ->withHeaders([
                 'webhook-id' => $message->event_id,

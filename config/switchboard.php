@@ -84,12 +84,18 @@ return [
     | its job is presumed lost and it is queued again. Keep it comfortably
     | longer than "timeout" plus the time a job waits on your queue.
     |
+    | "allowed_hosts" are hosts delivered to even though they resolve to a
+    | private or reserved address. Everything else must resolve to the public
+    | internet, because an endpoint's URL is usually someone else's input.
+    | Add "localhost" here for local development, never in production.
+    |
     */
 
     'outbox' => [
         'idempotency_window' => 86400,
         'timeout' => 15,
         'lease' => 300,
+        'allowed_hosts' => [],
     ],
 
     /*
