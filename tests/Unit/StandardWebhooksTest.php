@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Rooberthh\Switchboard\Exceptions\InvalidProviderSecret;
+use Rooberthh\Switchboard\Support\StandardWebhooksSignature;
 use Rooberthh\Switchboard\Tests\Fixtures\StandardWebhooksVector as Vector;
 use Rooberthh\Switchboard\Tests\Fixtures\StripeVerification;
 use Rooberthh\Switchboard\Verification\StandardWebhooks;
@@ -128,8 +129,8 @@ it('refuses to fail silently on a secret it cannot decode', function () {
 
 it('compares signatures in constant time', function () {
     // Timing cannot be asserted, so assert the only thing that guarantees it:
-    // the comparison the class performs.
-    $source = file_get_contents((new ReflectionClass(StandardWebhooks::class))->getFileName());
+    // the comparison the shared signing module performs.
+    $source = file_get_contents((new ReflectionClass(StandardWebhooksSignature::class))->getFileName());
 
     expect($source)->toContain('hash_equals(')
         ->and($source)->not->toContain('=== $candidate')
