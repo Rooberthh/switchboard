@@ -25,7 +25,9 @@ return new class extends Migration {
             $table->timestamps();
 
             $table->unique(['outbox_message_id', 'endpoint_id']);
-            $table->index(['delivered_at', 'failed_at', 'next_attempt_at']);
+            // Named, because the generated name runs past MySQL's 64
+            // characters. It serves the relay's search for due deliveries.
+            $table->index(['delivered_at', 'failed_at', 'next_attempt_at'], "{$this->table()}_due_index");
             $table->index('endpoint_id');
         });
     }

@@ -493,6 +493,36 @@ InboxMessage::query()->relayed()->unprocessed()->count();
 Relaying is not a lifecycle step: a relayed message is still **unprocessed**
 until a handler says otherwise.
 
+### Ingesting a message yourself
+
+Not every event arrives as a POST to the endpoint. When your own code holds a
+message it trusts — events it fetched from a provider's API after an outage, or
+ones delivered through a channel you already authenticate — ingest it:
+
+```php
+use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\Switchboard;
+
+foreach ($acme->eventsSince($outageStartedAt) as $event) {
+    Switchboard::ingest(new InboxMessageData(
+        provider: AcmeProvider::name(),
+        eventId: $event['id'],
+        eventType: $event['type'],
+        data: $event['data'],
+    ));
+}
+```
+
+The message goes through everything a verified request does. It is stored once
+per event ID, so an event that did arrive is not handled twice; its handler is
+queued and `InboxMessageReceived` fires, both after commit. `ingest()` returns
+the stored message, and throws for a provider name nobody registered.
+
+**Ingesting verifies nothing.** You are vouching for the message, so never
+ingest anything you have not authenticated yourself — least of all the body of
+a request you did not verify. Switchboard still never calls a provider;
+ingesting is how *your* code reconciles.
+
 ## Sending webhooks
 
 The outbox is the other half: your application **emits** a message, and
@@ -703,6 +733,58 @@ can be anything stable. Secrets must be Standard Webhooks secrets: `whsec_`
 and base64. To keep an existing secret on Switchboard's own table, pass it
 when creating the endpoint; otherwise one is generated.
 
+## Testing
+
+### Reaching a handler
+
+A test that goes through the endpoint has to sign a request in the provider's
+scheme. To test the handler map and your handlers end to end without one,
+[ingest](#ingesting-a-message-yourself) the message:
+
+```php
+use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\Switchboard;
+
+it('marks the invoice paid', function () {
+    $invoice = Invoice::factory()->create(['acme_id' => 'in_123']);
+
+    Switchboard::ingest(new InboxMessageData(
+        provider: AcmeProvider::name(),
+        eventId: 'evt_1',
+        eventType: 'invoice.paid',
+        subject: 'in_123',
+    ));
+
+    expect($invoice->fresh()->paid_at)->not->toBeNull();
+});
+```
+
+On the `sync` queue, which Laravel's `phpunit.xml` uses by default, the handler
+runs before `ingest()` returns. The message `ingest()` returns is as it was
+stored, so read `fresh()` to see it processed.
+
+### Testing a provider's parsing
+
+Ingesting skips `toInboxMessageData()`. Test that on its own, with a request
+built the way the provider sends it:
+
+```php
+use Illuminate\Http\Request;
+
+it('reads an acme request', function () {
+    $request = Request::create('/webhooks/acme', 'POST', server: ['HTTP_WEBHOOK_ID' => 'evt_1'], content: json_encode([
+        'type' => 'invoice.paid',
+        'data' => ['customer_id' => 'cus_1'],
+    ]));
+
+    $data = app(AcmeProvider::class)->toInboxMessageData($request);
+
+    expect($data->eventId)->toBe('evt_1')
+        ->and($data->eventType)->toBe('invoice.paid')
+        ->and($data->subject)->toBe('cus_1');
+});
+```
+
 ## Configuration
 
 `config/switchboard.php` holds **data only**. Behaviour lives in your provider
@@ -740,7 +822,7 @@ Switchboard follows semantic versioning. What that covers:
 | `Inbox\WebhookProvider` | Base class | Meant to be extended. Its methods are the seams and change only on a major version. |
 | `Verification\StandardWebhooks` | Verification | The shipped signature scheme. `final`: another scheme is another `Verification`. |
 | `Inbox\InboxMessageData` | Data object | Grows by appending optional constructor arguments. |
-| `Switchboard` | Static entry point | `provider()`, `resolve()`, `providers()`, `emit()`. Providers are registered and messages emitted here, never through a facade — there is none. |
+| `Switchboard` | Static entry point | `provider()`, `resolve()`, `providers()`, `emit()`, `ingest()`. Providers are registered and messages emitted and ingested here, never through a facade — there is none. |
 | `Events\*` | Events | Observation points. They carry the message and will keep carrying it. |
 | `Models\InboxMessage` | Model | Deliberately not `final`; an application may extend it. Nothing in the package names it except one internal resolver, so a model-swap configurator stays a one-line addition. |
 | `Models\OutboxMessage`, `Models\Endpoint`, `Models\Delivery` | Models | Deliberately not `final`. |
@@ -758,7 +840,10 @@ A test asserts this boundary, so it cannot drift silently.
   forensics, add a column to your own extended model
   (`docs/adr/0003-inbox-messages-are-normalized-records.md`).
 - **It does not reconcile against a provider's API.** That would require calling
-  a provider, reintroducing exactly the coupling this package removes.
+  a provider, reintroducing exactly the coupling this package removes. Your own
+  code can: fetch what the provider says it sent and
+  [ingest](#ingesting-a-message-yourself) it, and whatever already arrived is
+  deduplicated.
 - **It promises no delivery order.** Receivers order by the envelope's
   timestamp. Holding back an endpoint's queue behind one failing message would
   let a single bad delivery block a customer for days.

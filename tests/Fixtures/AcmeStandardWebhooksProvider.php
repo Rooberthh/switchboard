@@ -34,6 +34,7 @@ class AcmeStandardWebhooksProvider extends WebhookProvider
             eventId: (string) $request->header('webhook-id'),
             eventType: (string) ($payload['type'] ?? 'unknown'),
             data: (array) ($payload['data'] ?? []),
+            subject: isset($payload['data']['customer_id']) ? (string) $payload['data']['customer_id'] : null,
         );
     }
 }

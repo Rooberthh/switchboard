@@ -6,11 +6,14 @@ namespace Rooberthh\Switchboard;
 
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as RouteFacade;
+use Rooberthh\Switchboard\Actions\CreateInboxMessageAction;
 use Rooberthh\Switchboard\Actions\EmitOutboxMessageAction;
 use Rooberthh\Switchboard\Contracts\WebhookProvider;
 use Rooberthh\Switchboard\Exceptions\InvalidProvider;
 use Rooberthh\Switchboard\Exceptions\UnknownProvider;
 use Rooberthh\Switchboard\Http\Controllers\InboxController;
+use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Models\OutboxMessage;
 
 /**
@@ -115,6 +118,35 @@ final class Switchboard
     public static function emit(string $eventType, array $payload = [], ?string $idempotencyKey = null): OutboxMessage
     {
         return app(EmitOutboxMessageAction::class)->execute($eventType, $payload, $idempotencyKey);
+    }
+
+    /**
+     * Ingest an inbox message you have already verified: store it once per
+     * event ID, queue its handler and announce it, exactly as the endpoint
+     * does for a request that verified.
+     *
+     * Nothing is verified here — the caller vouches for the message. Use it
+     * in tests to reach a handler without signing a request, or for events
+     * your own code fetched from a provider's API or received through a
+     * channel you already trust. Switchboard itself never calls a provider.
+     *
+     * A repeat of an event ID returns the message already stored, untouched.
+     * Inside a transaction nothing is queued or announced until it commits.
+     *
+     * @param  InboxMessageData  $data
+     *
+     * @throws UnknownProvider when no provider is registered under $data->provider
+     */
+    public static function ingest(InboxMessageData $data): InboxMessage
+    {
+        // Here rather than on the queue, where a misspelt name would only
+        // surface as a failed job long after the caller moved on. Checked by
+        // name, so the provider is not built for it.
+        if (! isset(self::$providers[$data->provider])) {
+            throw UnknownProvider::for($data->provider);
+        }
+
+        return app(CreateInboxMessageAction::class)->execute($data);
     }
 
     /**
