@@ -70,7 +70,7 @@ it('delivers an emitted message to a subscribed endpoint, end to end', function 
 
     expect($delivery->endpoint_id)->toBe((string) $endpoint->id)
         ->and($delivery->isDelivered())->toBeTrue()
-        ->and($delivery->attempts)->toBe(1)
+        ->and($delivery->attempt_count)->toBe(1)
         ->and($delivery->last_status)->toBe(204)
         ->and($message->refresh()->relayed_at)->not->toBeNull();
 });

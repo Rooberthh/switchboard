@@ -91,6 +91,10 @@ _Avoid_: subscription, destination, receiver, webhook
 One endpoint's copy of one outbox message, and the record of the attempts to deliver it. The split between message and delivery is what makes "which messages did this endpoint never receive" answerable.
 _Avoid_: attempt, call, log entry
 
+**Attempt**:
+One try at sending a delivery: one request, or the refusal to make one, and what came back. Every attempt is kept, so a delivery's attempts are its whole history; a replay adds attempts and removes none. A delivery that ends because its endpoint is gone ends without one, since nothing was tried.
+_Avoid_: try, call, request, log entry
+
 **Emit**:
 To write an outbox message: one row, inside whatever transaction the caller is already in. Emitting never creates deliveries and never performs HTTP; both happen afterwards, once the message is committed.
 _Avoid_: send, dispatch, fire, publish

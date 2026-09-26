@@ -59,7 +59,7 @@ it('returns a failed delivery to pending, due now, with its schedule started ove
     $delivery = Delivery::query()->sole();
 
     expect($delivery->isPending())->toBeTrue()
-        ->and($delivery->attempts)->toBe(0)
+        ->and($delivery->attempt_count)->toBe(0)
         ->and($delivery->next_attempt_at->getTimestamp())->toBe(now()->getTimestamp());
 });
 

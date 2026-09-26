@@ -43,7 +43,7 @@ it('schedules a failed attempt for the next wait and records why', function () {
     $delivery = onlyDelivery();
 
     expect($delivery->isPending())->toBeTrue()
-        ->and($delivery->attempts)->toBe(1)
+        ->and($delivery->attempt_count)->toBe(1)
         ->and($delivery->last_status)->toBe(500)
         ->and($delivery->last_error)->toContain('500')
         ->and($delivery->next_attempt_at->getTimestamp())->toBe(now()->addSeconds(5)->getTimestamp());
@@ -64,7 +64,7 @@ it('attempts again once the wait has passed, and not before', function () {
     Http::assertSentCount(2);
 
     expect(onlyDelivery()->isDelivered())->toBeTrue()
-        ->and(onlyDelivery()->attempts)->toBe(2);
+        ->and(onlyDelivery()->attempt_count)->toBe(2);
 });
 
 it('retries a timeout or a refused connection on the schedule', function () {
@@ -123,7 +123,7 @@ it('fails for good once the schedule is spent, and says so', function () {
     Http::assertSentCount(10);
 
     expect($delivery->isFailed())->toBeTrue()
-        ->and($delivery->attempts)->toBe(10)
+        ->and($delivery->attempt_count)->toBe(10)
         ->and($delivery->next_attempt_at)->toBeNull()
         ->and($delivery->last_status)->toBe(503);
 

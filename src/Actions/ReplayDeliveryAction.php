@@ -14,7 +14,8 @@ use Rooberthh\Switchboard\Models\Delivery;
  * Only a failed delivery is eligible: sending a delivered one again would
  * repeat what the receiver already has. It starts the schedule over, and it
  * sends the same stored body to the same snapshotted URL — replay is re-run
- * of exactly what was sent.
+ * of exactly what was sent. The attempts already made are kept; the replayed
+ * ones are added after them.
  *
  * @internal
  */
@@ -32,7 +33,7 @@ final class ReplayDeliveryAction
 
         $delivery->forceFill([
             'failed_at' => null,
-            'attempts' => 0,
+            'attempt_count' => 0,
             'next_attempt_at' => Carbon::now(),
         ])->save();
     }

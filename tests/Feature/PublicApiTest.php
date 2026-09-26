@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Support\Facades\File;
+use Rooberthh\Switchboard\Models\Delivery;
+use Rooberthh\Switchboard\Models\DeliveryAttempt;
+use Rooberthh\Switchboard\Models\Endpoint;
 use Rooberthh\Switchboard\Models\InboxMessage;
+use Rooberthh\Switchboard\Models\OutboxMessage;
 use Illuminate\Support\Collection;
 use Rooberthh\Switchboard\Contracts\Verification;
 use Rooberthh\Switchboard\Contracts\WebhookProvider;
@@ -94,6 +98,10 @@ it('ships an implementation to start from beside every contract', function () {
 it('leaves the inbox message model open for an application to extend', function () {
     expect((new ReflectionClass(InboxMessage::class))->isFinal())->toBeFalse();
 });
+
+it('leaves the outbox models open for an application to extend', function (string $model) {
+    expect((new ReflectionClass($model))->isFinal())->toBeFalse();
+})->with([OutboxMessage::class, Endpoint::class, Delivery::class, DeliveryAttempt::class]);
 
 it('holds every event until the surrounding transaction commits', function () {
     // Nothing may act on a message that the transaction then rolled back, and

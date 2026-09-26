@@ -19,6 +19,7 @@ return [
         'outbox_messages' => 'switchboard_outbox_messages',
         'endpoints' => 'switchboard_endpoints',
         'deliveries' => 'switchboard_deliveries',
+        'delivery_attempts' => 'switchboard_delivery_attempts',
     ],
 
     /*

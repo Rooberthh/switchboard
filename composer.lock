@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a179c65b588b3b4db911dfeb179f77c1",
+    "content-hash": "89098eb2e583f1b56ccb7ebf4ffabee9",
     "packages": [
         {
             "name": "brick/math",
@@ -3064,6 +3064,55 @@
                 "source": "https://github.com/ramsey/uuid/tree/4.9.4"
             },
             "time": "2026-09-16T11:39:30+00:00"
+        },
+        {
+            "name": "rooberthh/php-http-tools",
+            "version": "0.1.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Rooberthh/php-http-tools.git",
+                "reference": "d2cbdd751df48c67e2a4d8b178a2b36bb78f2147"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Rooberthh/php-http-tools/zipball/d2cbdd751df48c67e2a4d8b178a2b36bb78f2147",
+                "reference": "d2cbdd751df48c67e2a4d8b178a2b36bb78f2147",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.3"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.13.7",
+                "phpstan/phpstan": "^1.10.50",
+                "roave/security-advisories": "dev-latest"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Rooberthh\\HttpTools\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Roberth Evaldsson",
+                    "email": "evaldsson.roberth@gmail.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Basic Enums for HTTP methods and status codes.",
+            "keywords": [
+                "php"
+            ],
+            "support": {
+                "issues": "https://github.com/rooberthh/php-http-tools/issues",
+                "source": "https://github.com/Rooberthh/php-http-tools/tree/0.1.2"
+            },
+            "time": "2026-09-26T05:09:47+00:00"
         },
         {
             "name": "symfony/clock",
@@ -10280,7 +10329,7 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": "^8.3"
+        "php": "^8.4"
     },
     "platform-dev": {},
     "plugin-api-version": "2.9.0"
