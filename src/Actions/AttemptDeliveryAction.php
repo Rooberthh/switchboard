@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Rooberthh\HttpTools\Enums\StatusCode;
 use Rooberthh\Switchboard\Contracts\Endpoints;
 use Rooberthh\Switchboard\Events\EndpointDisabled;
 use Rooberthh\Switchboard\Events\OutboxDeliveryFailed;
@@ -87,7 +88,7 @@ final class AttemptDeliveryAction
 
         // The receiver says the endpoint is gone: stop sending to it at all,
         // rather than spending three days of retries finding out.
-        if ($status === 410) {
+        if ($status === StatusCode::GONE->value) {
             $this->endpoints->disable($endpoint->id);
 
             event(new EndpointDisabled($endpoint));
@@ -271,7 +272,9 @@ final class AttemptDeliveryAction
      */
     private static function retryAfter(Response $response): ?int
     {
-        if (! in_array($response->status(), [429, 502, 504], true)) {
+        $throttled = [StatusCode::TOO_MANY_REQUESTS, StatusCode::BAD_GATEWAY, StatusCode::GATEWAY_TIMEOUT];
+
+        if (! in_array(StatusCode::tryFrom($response->status()), $throttled, true)) {
             return null;
         }
 
