@@ -443,10 +443,30 @@ php artisan switchboard:replay
 php artisan switchboard:replay --provider=stripe
 ```
 
+To replay one message, name it by the provider's event ID or by its inbox id:
+
+```bash
+php artisan switchboard:replay --event=evt_1NqX2f --provider=stripe
+php artisan switchboard:replay --id=42
+```
+
+An event ID is unique per provider, not overall: one event is stored once for
+each provider that received it, such as a Stripe event two modules' endpoints
+both subscribe to. When `--event` matches more than one provider it replays
+nothing and lists each copy, so you choose with `--provider` or `--id`:
+
+```
+ ERROR  Event evt_1NqX2f is stored under more than one provider. Choose one with --provider or --id:
+
+  ⇂ #41 stripe-checkout, failed
+  ⇂ #42 stripe-invoices, processed
+```
+
 Replay clears `failed_at` and `last_error` and re-dispatches processing, so the
 messages go back to unprocessed and a second run finds nothing. Only failed
 messages are eligible — re-running one that succeeded would repeat side effects
-your application has already performed.
+your application has already performed. Naming a message that has not failed,
+or one that does not exist, is an error that says which.
 
 Replay means **re-run, not re-verify**. An inbox message is a normalized record
 rather than a capture of the request, so a stored message's signature can never
