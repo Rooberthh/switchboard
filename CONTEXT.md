@@ -33,6 +33,10 @@ _Avoid_: stuck, orphaned, abandoned
 An inbound webhook, persisted on arrival before any handling happens. Persisting it is the whole of the inbox's responsibility during the request.
 _Avoid_: WebhookCall, call, incoming webhook, notification
 
+**Ingest**:
+To put an inbox message into the inbox: stored once per event ID, its handler queued, and announced, all after commit. The endpoint ingests a request once it has verified; an application may ingest a message it verified by other means, and vouches for it by doing so.
+_Avoid_: inject, import, push
+
 **Provider**:
 The external system an inbox message arrived from. It is represented in the application by exactly one webhook provider class, which names it, says how its requests are verified, reads what they mean, and maps its event types to handlers. The name that class gives is also the route segment, the secret's config key, and the value in the message's `provider` column. Applications write their own provider classes; Switchboard ships none.
 _Avoid_: source, sender, integration, driver
@@ -58,7 +62,7 @@ Recording that a handler succeeded. Distinct from *processing*, which is the han
 _Avoid_: completing, finishing, closing
 
 **Reconciliation**:
-Asking a provider for the events it says it sent, to find the ones that never arrived.
+Asking a provider for the events it says it sent, to find the ones that never arrived. Switchboard never does it; an application may, and ingests what it finds.
 _Avoid_: backfill, catch-up, sync
 
 ### Outbox
