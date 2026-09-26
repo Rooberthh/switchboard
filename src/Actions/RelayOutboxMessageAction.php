@@ -52,7 +52,7 @@ final class RelayOutboxMessageAction
                     'outbox_message_id' => $message->getKey(),
                     'endpoint_id' => $endpoint->id,
                     'url' => $endpoint->url,
-                    'attempts' => 0,
+                    'attempt_count' => 0,
                     'next_attempt_at' => $now,
                     'created_at' => $now,
                     'updated_at' => $now,

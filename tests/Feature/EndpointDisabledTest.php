@@ -34,7 +34,7 @@ it('disables the endpoint and ends the delivery on 410 gone', function () {
 
     expect($endpoint->refresh()->isDisabled())->toBeTrue()
         ->and($delivery->isFailed())->toBeTrue()
-        ->and($delivery->attempts)->toBe(1)
+        ->and($delivery->attempt_count)->toBe(1)
         ->and($delivery->last_status)->toBe(410);
 });
 
@@ -85,7 +85,7 @@ it('sends none of a disabled endpoint\'s other pending deliveries', function () 
     Http::assertSentCount(1);
 
     expect($second->refresh()->isFailed())->toBeTrue()
-        ->and($second->attempts)->toBe(0);
+        ->and($second->attempt_count)->toBe(0);
 });
 
 it('disables through the endpoints contract, so custom storage hears about it', function () {

@@ -11,12 +11,16 @@ return new class extends Migration {
     {
         Schema::create($this->table(), function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('outbox_message_id');
+            // Deleting a message takes its deliveries, and their attempts,
+            // with it: pruning is one delete, never a hunt for orphans.
+            $table->foreignId('outbox_message_id')
+                ->constrained($this->messages())
+                ->cascadeOnDelete();
             // A string with no foreign key: an application's own endpoint
             // storage may hand out ids that are not rows of our table.
             $table->string('endpoint_id');
             $table->string('url', 2048);
-            $table->unsignedSmallInteger('attempts')->default(0);
+            $table->unsignedSmallInteger('attempt_count')->default(0);
             $table->timestamp('next_attempt_at')->nullable();
             $table->timestamp('delivered_at')->nullable();
             $table->timestamp('failed_at')->nullable();
@@ -40,5 +44,10 @@ return new class extends Migration {
     private function table(): string
     {
         return (string) config('switchboard.tables.deliveries', 'switchboard_deliveries');
+    }
+
+    private function messages(): string
+    {
+        return (string) config('switchboard.tables.outbox_messages', 'switchboard_outbox_messages');
     }
 };

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -18,13 +21,18 @@ use Illuminate\Support\Carbon;
  * the relay created it, so a delivery's destination is fixed for its life;
  * the secret is not, and each attempt signs with the endpoint's current one.
  *
+ * Every attempt is kept (docs/adr/0008-the-outbox-keeps-every-delivery-attempt.md).
+ * The attempt count is the position in the current retry schedule, which a
+ * replay starts over; last_status and last_error summarise how the latest
+ * attempt, or the delivery itself, ended.
+ *
  * Public API, and deliberately not final: an application may extend it.
  *
  * @property int $id
  * @property int $outbox_message_id
  * @property string $endpoint_id
  * @property string $url
- * @property int $attempts
+ * @property int $attempt_count
  * @property Carbon|null $next_attempt_at
  * @property Carbon|null $delivered_at
  * @property Carbon|null $failed_at
@@ -33,6 +41,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read OutboxMessage $message
+ * @property-read Collection<int, DeliveryAttempt> $attempts
+ * @property-read DeliveryAttempt|null $latestAttempt
  */
 class Delivery extends Model
 {
@@ -49,7 +59,7 @@ class Delivery extends Model
     protected function casts(): array
     {
         return [
-            'attempts' => 'integer',
+            'attempt_count' => 'integer',
             'next_attempt_at' => 'datetime',
             'delivered_at' => 'datetime',
             'failed_at' => 'datetime',
@@ -63,6 +73,24 @@ class Delivery extends Model
     public function message(): BelongsTo
     {
         return $this->belongsTo(OutboxMessage::class, 'outbox_message_id');
+    }
+
+    /**
+     * Every attempt, replays included.
+     *
+     * @return HasMany<DeliveryAttempt, $this>
+     */
+    public function attempts(): HasMany
+    {
+        return $this->hasMany(DeliveryAttempt::class);
+    }
+
+    /**
+     * @return HasOne<DeliveryAttempt, $this>
+     */
+    public function latestAttempt(): HasOne
+    {
+        return $this->hasOne(DeliveryAttempt::class)->latestOfMany();
     }
 
     public function isDelivered(): bool

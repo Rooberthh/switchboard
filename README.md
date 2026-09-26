@@ -659,6 +659,32 @@ twice — it should deduplicate on `webhook-id` — and may see `invoice.paid`
 before `invoice.created` when the first attempt of one failed. Order by the
 envelope's `timestamp`, never by arrival.
 
+### Every attempt is kept
+
+Each attempt is recorded as its own `DeliveryAttempt`: the status the receiver
+answered (`null` for a timeout, a refused connection or a refused address), what
+went wrong in our words, how long it took, and the first kilobyte of the
+receiver's response body, which is usually where it says why it refused. The
+delivery itself carries a summary of how it last ended in `last_status` and
+`last_error`.
+
+```php
+use Rooberthh\Switchboard\Models\Delivery;
+
+$delivery = Delivery::query()->failed()->with('attempts')->first();
+
+foreach ($delivery->attempts as $attempt) {
+    // 401 · The endpoint answered 401. · 212ms · {"error":"signature mismatch"}
+    echo "{$attempt->status} · {$attempt->error} · {$attempt->duration_ms}ms · {$attempt->response_excerpt}";
+}
+
+$delivery->latestAttempt; // the one that ended it
+```
+
+Nothing is overwritten and nothing is removed, replays included
+(`docs/adr/0008-the-outbox-keeps-every-delivery-attempt.md`). A delivery whose
+endpoint was deleted or disabled ends with no attempt, because nothing was sent.
+
 ### Endpoints are someone else's input
 
 Every attempt resolves the endpoint's host, refuses it unless every address it
@@ -687,7 +713,8 @@ php artisan switchboard:outbox:replay --endpoint=42
 ```
 
 Replayed deliveries are due at once and the relay sends them on its next run —
-the same body to the same URL, with the retry schedule started over.
+the same body to the same URL, with the retry schedule started over. The
+attempts made before the replay are kept.
 
 ### Outbox events
 
@@ -845,7 +872,7 @@ Switchboard follows semantic versioning. What that covers:
 | `Switchboard` | Static entry point | `provider()`, `resolve()`, `providers()`, `emit()`, `ingest()`. Providers are registered and messages emitted and ingested here, never through a facade — there is none. |
 | `Events\*` | Events | Observation points. They carry the message and will keep carrying it. |
 | `Models\InboxMessage` | Model | Deliberately not `final`; an application may extend it. Nothing in the package names it except one internal resolver, so a model-swap configurator stays a one-line addition. |
-| `Models\OutboxMessage`, `Models\Endpoint`, `Models\Delivery` | Models | Deliberately not `final`. |
+| `Models\OutboxMessage`, `Models\Endpoint`, `Models\Delivery`, `Models\DeliveryAttempt` | Models | Deliberately not `final`. |
 | `config/switchboard.php` | Configuration | Data only: table names, queues, tolerances, retries. |
 | `Actions\*`, `Http\*`, `Jobs\*`, `Console\*`, `Support\*`, `Inbox\InboxMessages`, `Inbox\Staleness`, `Outbox\DatabaseEndpoints` | **Internal** | `final` and `@internal`. Swap behaviour through a seam above, never by subclassing these. They change without a major version. |
 
@@ -858,7 +885,9 @@ A test asserts this boundary, so it cannot drift silently.
 - **It stores no raw bodies and no headers.** An inbox message is a normalized
   record of what an event means, not an audit log of an HTTP request. If you need
   forensics, add a column to your own extended model
-  (`docs/adr/0003-inbox-messages-are-normalized-records.md`).
+  (`docs/adr/0003-inbox-messages-are-normalized-records.md`). The one exception
+  is the outbox: each delivery attempt keeps the first kilobyte of the
+  receiver's response body, and no headers.
 - **It does not reconcile against a provider's API.** That would require calling
   a provider, reintroducing exactly the coupling this package removes. Your own
   code can: fetch what the provider says it sent and
