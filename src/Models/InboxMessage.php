@@ -8,7 +8,7 @@ use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
-use Rooberthh\Switchboard\Inbox\Staleness;
+use Rooberthh\Switchboard\Support\Inbox\Staleness;
 
 /**
  * An inbound webhook, persisted on arrival before anything acts on it.

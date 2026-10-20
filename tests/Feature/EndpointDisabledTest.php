@@ -7,12 +7,12 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Rooberthh\Switchboard\Contracts\Endpoints;
 use Rooberthh\Switchboard\Events\EndpointDisabled;
-use Rooberthh\Switchboard\Jobs\AttemptDelivery;
+use Rooberthh\Switchboard\Jobs\Outbox\AttemptDelivery;
 use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\Models\Endpoint;
 use Rooberthh\Switchboard\Switchboard;
-use Rooberthh\Switchboard\Actions\AttemptDeliveryAction;
-use Rooberthh\Switchboard\Outbox\EndpointData;
+use Rooberthh\Switchboard\Actions\Outbox\AttemptDeliveryAction;
+use Rooberthh\Switchboard\DataObjects\Outbox\EndpointData;
 
 beforeEach(function () {
     Http::preventStrayRequests();

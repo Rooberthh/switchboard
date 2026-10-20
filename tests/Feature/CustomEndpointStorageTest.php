@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Rooberthh\Switchboard\Contracts\Endpoints;
 use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\Models\Endpoint;
-use Rooberthh\Switchboard\Outbox\EndpointData;
+use Rooberthh\Switchboard\DataObjects\Outbox\EndpointData;
 use Rooberthh\Switchboard\Switchboard;
 use Rooberthh\Switchboard\Tests\Fixtures\InMemoryEndpoints;
 use Rooberthh\Switchboard\Verification\StandardWebhooks;

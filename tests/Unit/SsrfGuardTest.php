@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Rooberthh\Switchboard\Exceptions\UnsafeEndpoint;
-use Rooberthh\Switchboard\Support\SsrfGuard;
+use Rooberthh\Switchboard\Support\Outbox\SsrfGuard;
 
 function guardResolving(string ...$addresses): SsrfGuard
 {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Rooberthh\Switchboard\Contracts;
 
-use Rooberthh\Switchboard\Outbox\EndpointData;
+use Rooberthh\Switchboard\DataObjects\Outbox\EndpointData;
 
 /**
  * Where the outbox's endpoints come from.

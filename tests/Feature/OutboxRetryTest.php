@@ -7,10 +7,10 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Rooberthh\Switchboard\Events\OutboxDeliveryFailed;
-use Rooberthh\Switchboard\Jobs\AttemptDelivery;
+use Rooberthh\Switchboard\Jobs\Outbox\AttemptDelivery;
 use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\Models\Endpoint;
-use Rooberthh\Switchboard\Support\RetrySchedule;
+use Rooberthh\Switchboard\Support\Outbox\RetrySchedule;
 use Rooberthh\Switchboard\Switchboard;
 
 beforeEach(function () {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard\Contracts;
 
 use Illuminate\Http\Request;
-use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\DataObjects\Inbox\InboxMessageData;
 use Rooberthh\Switchboard\Models\InboxMessage;
 
 /**
@@ -18,7 +18,7 @@ use Rooberthh\Switchboard\Models\InboxMessage;
  * that a method added here is a breaking change; see
  * docs/adr/0005-a-provider-is-one-class.md.
  *
- * Most applications extend {@see \Rooberthh\Switchboard\Inbox\WebhookProvider}
+ * Most applications extend {@see \Rooberthh\Switchboard\WebhookProvider}
  * rather than implementing this directly.
  *
  * Public API.

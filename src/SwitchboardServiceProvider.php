@@ -6,12 +6,12 @@ namespace Rooberthh\Switchboard;
 
 use Illuminate\Support\ServiceProvider;
 use Rooberthh\Switchboard\Contracts\Endpoints;
-use Rooberthh\Switchboard\Outbox\DatabaseEndpoints;
-use Rooberthh\Switchboard\Console\MakeWebhookProviderCommand;
-use Rooberthh\Switchboard\Console\OutboxRelayCommand;
-use Rooberthh\Switchboard\Console\OutboxReplayCommand;
-use Rooberthh\Switchboard\Console\RelayCommand;
-use Rooberthh\Switchboard\Console\ReplayCommand;
+use Rooberthh\Switchboard\Support\Outbox\DatabaseEndpoints;
+use Rooberthh\Switchboard\Console\Inbox\MakeWebhookProviderCommand;
+use Rooberthh\Switchboard\Console\Outbox\OutboxRelayCommand;
+use Rooberthh\Switchboard\Console\Outbox\OutboxReplayCommand;
+use Rooberthh\Switchboard\Console\Inbox\RelayCommand;
+use Rooberthh\Switchboard\Console\Inbox\ReplayCommand;
 
 class SwitchboardServiceProvider extends ServiceProvider
 {

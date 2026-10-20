@@ -7,7 +7,7 @@ namespace Rooberthh\Switchboard\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
-use Rooberthh\Switchboard\Outbox\EndpointData;
+use Rooberthh\Switchboard\DataObjects\Outbox\EndpointData;
 
 /**
  * A URL that receives outbound messages, together with the exact event types

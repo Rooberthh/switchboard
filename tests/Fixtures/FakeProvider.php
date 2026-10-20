@@ -7,8 +7,8 @@ namespace Rooberthh\Switchboard\Tests\Fixtures;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Rooberthh\Switchboard\Contracts\Verification;
-use Rooberthh\Switchboard\Inbox\InboxMessageData;
-use Rooberthh\Switchboard\Inbox\WebhookProvider;
+use Rooberthh\Switchboard\DataObjects\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\WebhookProvider;
 
 /**
  * A provider that verifies everything and reads the message's fields straight

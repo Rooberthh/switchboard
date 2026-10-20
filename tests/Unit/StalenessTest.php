@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Carbon;
-use Rooberthh\Switchboard\Inbox\Staleness;
+use Rooberthh\Switchboard\Support\Inbox\Staleness;
 
 beforeEach(function () {
     config([

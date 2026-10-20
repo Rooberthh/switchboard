@@ -60,9 +60,9 @@ with [Standard Webhooks](https://www.standardwebhooks.com/):
 ```php
 use Illuminate\Http\Request;
 use Rooberthh\Switchboard\Contracts\Verification;
-use Rooberthh\Switchboard\Inbox\InboxMessageData;
-use Rooberthh\Switchboard\Inbox\WebhookProvider;
+use Rooberthh\Switchboard\DataObjects\Inbox\InboxMessageData;
 use Rooberthh\Switchboard\Verification\StandardWebhooks;
+use Rooberthh\Switchboard\WebhookProvider;
 
 final class AcmeProvider extends WebhookProvider
 {
@@ -520,7 +520,7 @@ message it trusts — events it fetched from a provider's API after an outage, o
 ones delivered through a channel you already authenticate — ingest it:
 
 ```php
-use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\DataObjects\Inbox\InboxMessageData;
 use Rooberthh\Switchboard\Switchboard;
 
 foreach ($acme->eventsSince($outageStartedAt) as $event) {
@@ -736,7 +736,7 @@ table, one per tenant, an external service — bind your own implementation of
 
 ```php
 use Rooberthh\Switchboard\Contracts\Endpoints;
-use Rooberthh\Switchboard\Outbox\EndpointData;
+use Rooberthh\Switchboard\DataObjects\Outbox\EndpointData;
 
 final class TenantEndpoints implements Endpoints
 {
@@ -789,7 +789,7 @@ scheme. To test the handler map and your handlers end to end without one,
 [ingest](#ingesting-a-message-yourself) the message:
 
 ```php
-use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\DataObjects\Inbox\InboxMessageData;
 use Rooberthh\Switchboard\Switchboard;
 
 it('marks the invoice paid', function () {
@@ -865,16 +865,16 @@ Switchboard follows semantic versioning. What that covers:
 | --- | --- | --- |
 | `Contracts\WebhookProvider` | Contract | **Adding a method is a breaking change.** Deliberately larger than the other contracts, so an integration reads as one class (`docs/adr/0005-a-provider-is-one-class.md`). New information travels in `InboxMessageData` instead, as an optional constructor argument. |
 | `Contracts\Verification` | Contract | One method, and kept that way. |
-| `Contracts\Endpoints` | Contract | Three methods, and kept that way. `Outbox\EndpointData` is what it hands out, and grows by optional constructor arguments. |
-| `Inbox\WebhookProvider` | Base class | Meant to be extended. Its methods are the seams and change only on a major version. |
+| `Contracts\Endpoints` | Contract | Three methods, and kept that way. `DataObjects\Outbox\EndpointData` is what it hands out, and grows by optional constructor arguments. |
+| `WebhookProvider` | Base class | Meant to be extended. Its methods are the seams and change only on a major version. |
 | `Verification\StandardWebhooks` | Verification | The shipped signature scheme. `final`: another scheme is another `Verification`. |
-| `Inbox\InboxMessageData` | Data object | Grows by appending optional constructor arguments. |
+| `DataObjects\Inbox\InboxMessageData` | Data object | Grows by appending optional constructor arguments. |
 | `Switchboard` | Static entry point | `provider()`, `resolve()`, `providers()`, `emit()`, `ingest()`. Providers are registered and messages emitted and ingested here, never through a facade — there is none. |
 | `Events\*` | Events | Observation points. They carry the message and will keep carrying it. |
 | `Models\InboxMessage` | Model | Deliberately not `final`; an application may extend it. Nothing in the package names it except one internal resolver, so a model-swap configurator stays a one-line addition. |
 | `Models\OutboxMessage`, `Models\Endpoint`, `Models\Delivery`, `Models\DeliveryAttempt` | Models | Deliberately not `final`. |
 | `config/switchboard.php` | Configuration | Data only: table names, queues, tolerances, retries. |
-| `Actions\*`, `Http\*`, `Jobs\*`, `Console\*`, `Support\*`, `Inbox\InboxMessages`, `Inbox\Staleness`, `Outbox\DatabaseEndpoints` | **Internal** | `final` and `@internal`. Swap behaviour through a seam above, never by subclassing these. They change without a major version. |
+| `Actions\*`, `Http\*`, `Jobs\*`, `Console\*`, `Support\*` | **Internal** | `final` and `@internal`. Swap behaviour through a seam above, never by subclassing these. They change without a major version. |
 
 A test asserts this boundary, so it cannot drift silently.
 

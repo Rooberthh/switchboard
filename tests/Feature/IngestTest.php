@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Rooberthh\Switchboard\Contracts\Verification;
 use Rooberthh\Switchboard\Exceptions\InvalidInboxMessage;
-use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\DataObjects\Inbox\InboxMessageData;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Switchboard;
 use Rooberthh\Switchboard\Tests\Fixtures\FakeProvider;

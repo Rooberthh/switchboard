@@ -9,7 +9,7 @@ use Rooberthh\Switchboard\Switchboard;
 use Rooberthh\Switchboard\Tests\Fixtures\FakeProvider;
 use Rooberthh\Switchboard\Tests\Fixtures\RecordingHandler;
 use Illuminate\Testing\TestResponse;
-use Rooberthh\Switchboard\Jobs\ProcessInboxMessage;
+use Rooberthh\Switchboard\Jobs\Inbox\ProcessInboxMessage;
 
 beforeEach(function () {
     RecordingHandler::$calls = [];

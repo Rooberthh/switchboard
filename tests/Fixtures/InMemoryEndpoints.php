@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard\Tests\Fixtures;
 
 use Rooberthh\Switchboard\Contracts\Endpoints;
-use Rooberthh\Switchboard\Outbox\EndpointData;
+use Rooberthh\Switchboard\DataObjects\Outbox\EndpointData;
 
 /**
  * An application's own endpoint storage, reduced to an array: the README's
