@@ -2,13 +2,14 @@
 
 `rooberthh/switchboard` is a Laravel package providing an **inbox** (receiving webhooks) and an **outbox** (sending webhooks) with one shared core. Think of it as an SDK for webhooks: it removes the boilerplate an application writes around them and ships no integrations of its own.
 
-Read `CONTEXT.md` for the vocabulary and `docs/adr/` for the decisions before designing anything new. The Obsidian design doc at `~/Documents/Brain/1-Projects/Laravel Webhook Package.md` is **superseded** for anything it disagrees with: its task list and schema predate the design work and the repo is now the source of truth.
+Read `GLOSSARY.md` for the vocabulary and `docs/adr/` for the decisions before designing anything new. Read `CODING_STANDARDS.md` before changing a contract or anything that verifies, signs or sends.
 
-**v1 (0.1.0) is the inbox and a way to consume it.** The outbox follows in 0.2.0. See ADR-0002.
+**0.1.0 was the inbox and a way to consume it; 0.2.0 adds the outbox.** See ADR-0002.
 
 ## Commands
 
 ```bash
+composer check         # everything CI runs: pint --test, stan, test
 composer test          # Pest 5 + Orchestra Testbench 11
 composer stan          # PHPStan level 8 via Larastan
 composer pint          # Pint, preset "per" (pint.json)
@@ -37,30 +38,6 @@ The package works with zero config, and anything a platform needs to make its ow
 
 Add a seam only for a real integration need, never for internal layering.
 
-## BC rules
-
-- Every contract is public API. Keep contracts to 1–3 methods and ship a base class or implementation next to each one. Adding a method to an interface is a breaking change. The one deliberate exception is `Contracts\WebhookProvider` (ADR-0005).
-- Internals (jobs, middleware, controllers, relay) are `final` and `@internal`. Users swap behavior through a seam, never by subclassing internals.
-- Every extension point gets a test that swaps it and a README recipe.
-
-## Security
-
-Test the properties, not just the happy path. These must be **rejected** in tests:
-
-- tampered body
-- wrong secret
-- stale timestamp
-- downgraded signature scheme
-- SSRF targets (private IP, DNS rebinding, redirects)
-- a rolled-back transaction must not emit
-
-Compare signatures with `hash_equals()`, and always verify the raw request body.
-
-## Code style
-
-- `declare(strict_types=1)` in every PHP file.
-- Laravel-native patterns over cleverness. Match the existing packages in `~/code/packages` (see `insight-api`).
-
 ## Agent skills
 
 ### Issue tracker
@@ -73,4 +50,4 @@ The five canonical labels, unchanged: `needs-triage`, `needs-info`, `ready-for-a
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
