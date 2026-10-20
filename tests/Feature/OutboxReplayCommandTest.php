@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Http;
-use Rooberthh\Switchboard\Actions\ReplayDeliveryAction;
+use Rooberthh\Switchboard\Actions\Outbox\ReplayDeliveryAction;
 use Rooberthh\Switchboard\Exceptions\IllegalTransition;
 use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\Models\Endpoint;

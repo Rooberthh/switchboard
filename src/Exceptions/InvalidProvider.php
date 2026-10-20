@@ -17,7 +17,7 @@ final class InvalidProvider extends InvalidArgumentException
     {
         return new self(
             "[{$class}] is not a Switchboard provider. It must implement " . WebhookProvider::class
-            . ', most simply by extending ' . \Rooberthh\Switchboard\Inbox\WebhookProvider::class . '.',
+            . ', most simply by extending ' . \Rooberthh\Switchboard\WebhookProvider::class . '.',
         );
     }
 

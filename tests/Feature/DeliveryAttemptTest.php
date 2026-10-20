@@ -6,13 +6,13 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
-use Rooberthh\Switchboard\Actions\AttemptDeliveryAction;
-use Rooberthh\Switchboard\Jobs\AttemptDelivery;
+use Rooberthh\Switchboard\Actions\Outbox\AttemptDeliveryAction;
+use Rooberthh\Switchboard\Jobs\Outbox\AttemptDelivery;
 use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\Models\DeliveryAttempt;
 use Rooberthh\Switchboard\Models\Endpoint;
-use Rooberthh\Switchboard\Support\RetrySchedule;
-use Rooberthh\Switchboard\Support\SsrfGuard;
+use Rooberthh\Switchboard\Support\Outbox\RetrySchedule;
+use Rooberthh\Switchboard\Support\Outbox\SsrfGuard;
 use Rooberthh\Switchboard\Switchboard;
 
 beforeEach(function () {

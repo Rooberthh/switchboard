@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard\Events;
 
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
-use Rooberthh\Switchboard\Outbox\EndpointData;
+use Rooberthh\Switchboard\DataObjects\Outbox\EndpointData;
 
 /**
  * An endpoint's receiver answered 410 Gone, so the endpoint is disabled and

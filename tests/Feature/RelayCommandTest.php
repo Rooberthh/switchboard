@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
-use Rooberthh\Switchboard\Inbox\Staleness;
+use Rooberthh\Switchboard\Support\Inbox\Staleness;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Switchboard;
 use Rooberthh\Switchboard\Tests\Fixtures\FakeProvider;

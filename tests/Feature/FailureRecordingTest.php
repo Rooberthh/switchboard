@@ -7,7 +7,7 @@ use Rooberthh\Switchboard\Switchboard;
 use Rooberthh\Switchboard\Tests\Fixtures\ThrowingHandler;
 use Rooberthh\Switchboard\Tests\Fixtures\ThrowingProvider;
 use Illuminate\Testing\TestResponse;
-use Rooberthh\Switchboard\Jobs\ProcessInboxMessage;
+use Rooberthh\Switchboard\Jobs\Inbox\ProcessInboxMessage;
 
 beforeEach(function () {
     ThrowingHandler::$attempts = 0;

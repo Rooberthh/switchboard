@@ -12,7 +12,7 @@ use Rooberthh\Switchboard\Models\OutboxMessage;
 use Illuminate\Support\Collection;
 use Rooberthh\Switchboard\Contracts\Verification;
 use Rooberthh\Switchboard\Contracts\WebhookProvider;
-use Rooberthh\Switchboard\Inbox\WebhookProvider as BaseWebhookProvider;
+use Rooberthh\Switchboard\WebhookProvider as BaseWebhookProvider;
 use Rooberthh\Switchboard\Verification\StandardWebhooks;
 
 /**
@@ -29,25 +29,17 @@ function packageClasses(): Collection
 }
 
 /**
- * Internals that do not live under an internal namespace, and so have to be
- * named one by one. Keep the list short: it is easier to justify a namespace
- * than an exception.
+ * Internals are known by namespace alone. An internal that does not fit one of
+ * these belongs in Support, not on a list of exceptions.
  * @param string $class
  */
 function isInternal(string $class): bool
 {
-    $named = [
-        'Rooberthh\\Switchboard\\Inbox\\InboxMessages',
-        'Rooberthh\\Switchboard\\Inbox\\Staleness',
-        'Rooberthh\\Switchboard\\Outbox\\DatabaseEndpoints',
-    ];
-
     $namespaces = ['Actions', 'Console', 'Http', 'Jobs', 'Support'];
 
-    return in_array($class, $named, true)
-        || collect($namespaces)->contains(
-            fn(string $namespace): bool => str_starts_with($class, "Rooberthh\\Switchboard\\{$namespace}\\"),
-        );
+    return collect($namespaces)->contains(
+        fn(string $namespace): bool => str_starts_with($class, "Rooberthh\\Switchboard\\{$namespace}\\"),
+    );
 }
 
 it('keeps every internal final and marked internal', function () {

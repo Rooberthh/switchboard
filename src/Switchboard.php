@@ -6,13 +6,13 @@ namespace Rooberthh\Switchboard;
 
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as RouteFacade;
-use Rooberthh\Switchboard\Actions\CreateInboxMessageAction;
-use Rooberthh\Switchboard\Actions\EmitOutboxMessageAction;
+use Rooberthh\Switchboard\Actions\Inbox\CreateInboxMessageAction;
+use Rooberthh\Switchboard\Actions\Outbox\EmitOutboxMessageAction;
 use Rooberthh\Switchboard\Contracts\WebhookProvider;
 use Rooberthh\Switchboard\Exceptions\InvalidProvider;
 use Rooberthh\Switchboard\Exceptions\UnknownProvider;
-use Rooberthh\Switchboard\Http\Controllers\InboxController;
-use Rooberthh\Switchboard\Inbox\InboxMessageData;
+use Rooberthh\Switchboard\Http\Controllers\Inbox\InboxController;
+use Rooberthh\Switchboard\DataObjects\Inbox\InboxMessageData;
 use Rooberthh\Switchboard\Models\InboxMessage;
 use Rooberthh\Switchboard\Models\OutboxMessage;
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Rooberthh\Switchboard\Support\RetrySchedule;
+use Rooberthh\Switchboard\Support\Outbox\RetrySchedule;
 
 beforeEach(function () {
     $this->freezeTime();

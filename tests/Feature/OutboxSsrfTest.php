@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Http;
 use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\Models\Endpoint;
-use Rooberthh\Switchboard\Support\SsrfGuard;
+use Rooberthh\Switchboard\Support\Outbox\SsrfGuard;
 use Rooberthh\Switchboard\Switchboard;
 
 beforeEach(function () {

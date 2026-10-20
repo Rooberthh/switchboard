@@ -6,9 +6,9 @@ namespace {{ namespace }};
 
 use Illuminate\Http\Request;
 use Rooberthh\Switchboard\Contracts\Verification;
-use Rooberthh\Switchboard\Inbox\InboxMessageData;
-use Rooberthh\Switchboard\Inbox\WebhookProvider;
+use Rooberthh\Switchboard\DataObjects\Inbox\InboxMessageData;
 use Rooberthh\Switchboard\Verification\StandardWebhooks;
+use Rooberthh\Switchboard\WebhookProvider;
 
 final class {{ class }} extends WebhookProvider
 {

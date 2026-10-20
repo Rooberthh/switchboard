@@ -6,7 +6,7 @@ namespace Rooberthh\Switchboard\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Orchestra\Testbench\TestCase as BaseTestCase;
-use Rooberthh\Switchboard\Support\SsrfGuard;
+use Rooberthh\Switchboard\Support\Outbox\SsrfGuard;
 use Rooberthh\Switchboard\Switchboard;
 use Rooberthh\Switchboard\SwitchboardServiceProvider;
 
