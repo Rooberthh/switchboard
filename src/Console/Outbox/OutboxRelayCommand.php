@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard\Console\Outbox;
 
 use Illuminate\Console\Command;
-use Rooberthh\Switchboard\Actions\Outbox\QueueDeliveryAction;
-use Rooberthh\Switchboard\Actions\Outbox\RelayOutboxMessageAction;
 use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\Models\OutboxMessage;
+use Rooberthh\Switchboard\Support\Outbox\DeliveryLifecycle;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
@@ -29,21 +28,21 @@ final class OutboxRelayCommand extends Command
     /** @var string */
     protected $description = 'Turn emitted outbox messages into deliveries and queue every delivery that is due';
 
-    public function handle(RelayOutboxMessageAction $relay, QueueDeliveryAction $queue): int
+    public function handle(DeliveryLifecycle $lifecycle): int
     {
         $messages = 0;
         $deliveries = 0;
 
         // Paged by id: relaying a message removes it from this query.
-        OutboxMessage::query()->unrelayed()->eachById(function (OutboxMessage $message) use ($relay, &$messages, &$deliveries): void {
-            $deliveries += $relay->execute($message);
+        OutboxMessage::query()->unrelayed()->eachById(function (OutboxMessage $message) use ($lifecycle, &$messages, &$deliveries): void {
+            $deliveries += $lifecycle->relay($message);
             $messages++;
         });
 
         $queued = 0;
 
-        Delivery::query()->due()->eachById(function (Delivery $delivery) use ($queue, &$queued): void {
-            if ($queue->execute($delivery)) {
+        Delivery::query()->due()->eachById(function (Delivery $delivery) use ($lifecycle, &$queued): void {
+            if ($lifecycle->queue($delivery)) {
                 $queued++;
             }
         });
