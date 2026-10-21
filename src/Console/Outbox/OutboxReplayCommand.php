@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard\Console\Outbox;
 
 use Illuminate\Console\Command;
-use Rooberthh\Switchboard\Actions\Outbox\ReplayDeliveryAction;
 use Rooberthh\Switchboard\Models\Delivery;
+use Rooberthh\Switchboard\Support\Outbox\DeliveryLifecycle;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
@@ -27,7 +27,7 @@ final class OutboxReplayCommand extends Command
     /** @var string */
     protected $description = 'Return failed outbox deliveries to pending, for the relay to send again';
 
-    public function handle(ReplayDeliveryAction $replay): int
+    public function handle(DeliveryLifecycle $lifecycle): int
     {
         $query = Delivery::query()->failed();
 
@@ -48,8 +48,8 @@ final class OutboxReplayCommand extends Command
         $replayed = 0;
 
         // Paged by id, not by offset: replaying removes the row from this query.
-        $query->eachById(function (Delivery $delivery) use (&$replayed, $replay): void {
-            $replay->execute($delivery);
+        $query->eachById(function (Delivery $delivery) use (&$replayed, $lifecycle): void {
+            $lifecycle->replay($delivery);
 
             $replayed++;
         });

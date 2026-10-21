@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Http;
-use Rooberthh\Switchboard\Actions\Outbox\ReplayDeliveryAction;
 use Rooberthh\Switchboard\Exceptions\IllegalTransition;
 use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\Models\Endpoint;
+use Rooberthh\Switchboard\Support\Outbox\DeliveryLifecycle;
 use Rooberthh\Switchboard\Switchboard;
 
 beforeEach(function () {
@@ -102,7 +102,7 @@ it('never replays a delivered delivery', function () {
         ->expectsOutputToContain('Replayed 0 failed outbox deliveries.')
         ->assertSuccessful();
 
-    expect(fn() => app(ReplayDeliveryAction::class)->execute(Delivery::query()->sole()))
+    expect(fn() => app(DeliveryLifecycle::class)->replay(Delivery::query()->sole()))
         ->toThrow(IllegalTransition::class);
 
     Http::assertSentCount(1);
