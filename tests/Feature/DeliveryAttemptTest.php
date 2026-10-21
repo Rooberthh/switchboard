@@ -3,10 +3,14 @@
 declare(strict_types=1);
 
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Rooberthh\Switchboard\Actions\Outbox\AttemptDeliveryAction;
+use Rooberthh\Switchboard\Contracts\Endpoints;
+use Rooberthh\Switchboard\DataObjects\Outbox\EndpointData;
+use Rooberthh\Switchboard\Exceptions\InvalidProviderSecret;
 use Rooberthh\Switchboard\Jobs\Outbox\AttemptDelivery;
 use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\Models\DeliveryAttempt;
@@ -14,6 +18,7 @@ use Rooberthh\Switchboard\Models\Endpoint;
 use Rooberthh\Switchboard\Support\Outbox\RetrySchedule;
 use Rooberthh\Switchboard\Support\Outbox\SsrfGuard;
 use Rooberthh\Switchboard\Switchboard;
+use Rooberthh\Switchboard\Tests\Fixtures\InMemoryEndpoints;
 
 beforeEach(function () {
     $this->freezeTime();
@@ -26,7 +31,7 @@ beforeEach(function () {
 
 function attemptedEndpoint(string $url = 'https://hooks.acme.test/hook'): Endpoint
 {
-    return Endpoint::query()->create(['url' => $url, 'event_types' => ['invoice.paid']]);
+    return Endpoint::query()->create(['url' => $url, 'event_types' => ['invoice.paid'], 'secret' => Endpoint::generateSecret()]);
 }
 
 function relayAttempts(): void
@@ -140,6 +145,34 @@ it('records a refused private address as an attempt, with nothing sent', functio
         ->and($attempt->status)->toBeNull()
         ->and($attempt->error)->toContain('not a public address');
 });
+
+it('records an attempt, and reports it, when the endpoint\'s secret cannot be used', function (string $secret, string $why) {
+    Exceptions::fake();
+    Http::fake();
+
+    $endpoints = new InMemoryEndpoints();
+    $endpoints->add(new EndpointData('tenant-7:billing', 'https://hooks.acme.test/hook', $secret), ['invoice.paid']);
+    app()->instance(Endpoints::class, $endpoints);
+
+    Switchboard::emit('invoice.paid');
+    relayAttempts();
+
+    $delivery = Delivery::query()->sole();
+    $attempt = $delivery->attempts()->sole();
+
+    Http::assertNothingSent();
+    Exceptions::assertReported(InvalidProviderSecret::class);
+
+    expect($delivery->attempt_count)->toBe(1)
+        ->and($delivery->isPending())->toBeTrue()
+        ->and($delivery->next_attempt_at->isFuture())->toBeTrue()
+        ->and($delivery->last_error)->toContain($why)
+        ->and($attempt->status)->toBeNull()
+        ->and($attempt->error)->toContain($why);
+})->with([
+    'not base64' => ['whsec_a raw secret, not base64', 'not valid base64'],
+    'empty, which would sign with no key at all' => ['', 'empty'],
+]);
 
 it('records a redirect as an attempt, without following it', function () {
     Http::fake(['*' => Http::response(null, 302, ['Location' => 'http://169.254.169.254/'])]);

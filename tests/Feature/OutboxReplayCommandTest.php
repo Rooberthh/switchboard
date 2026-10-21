@@ -18,7 +18,7 @@ beforeEach(function () {
 
 function failingEndpoint(string $host): Endpoint
 {
-    return Endpoint::query()->create(['url' => "https://{$host}/hook", 'event_types' => ['invoice.paid']]);
+    return Endpoint::query()->create(['url' => "https://{$host}/hook", 'event_types' => ['invoice.paid'], 'secret' => Endpoint::generateSecret()]);
 }
 
 it('sends a failed delivery again once replayed, byte for byte to the same url', function () {

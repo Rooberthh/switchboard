@@ -28,7 +28,7 @@ beforeEach(function () {
 
 function endpoint(array $eventTypes = ['invoice.paid'], string $url = 'https://hooks.acme.test/switchboard', array $attributes = []): Endpoint
 {
-    return Endpoint::query()->create(['url' => $url, 'event_types' => $eventTypes, ...$attributes]);
+    return Endpoint::query()->create(['url' => $url, 'event_types' => $eventTypes, 'secret' => Endpoint::generateSecret(), ...$attributes]);
 }
 
 function relay(): void
@@ -265,7 +265,7 @@ it('skips a delivery that is no longer pending when its job runs', function () {
     Http::assertNothingSent();
 });
 
-it('generates a standard webhooks secret for a new endpoint and stores it encrypted', function () {
+it('generates standard webhooks secrets, and stores an endpoint\'s encrypted', function () {
     $endpoint = endpoint();
 
     expect($endpoint->secret)->toStartWith('whsec_')

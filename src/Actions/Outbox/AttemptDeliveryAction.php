@@ -16,12 +16,14 @@ use Rooberthh\Switchboard\Contracts\Endpoints;
 use Rooberthh\Switchboard\Events\EndpointDisabled;
 use Rooberthh\Switchboard\Events\OutboxDeliveryFailed;
 use Rooberthh\Switchboard\Events\OutboxDeliverySucceeded;
+use Rooberthh\Switchboard\Exceptions\InvalidProviderSecret;
 use Rooberthh\Switchboard\Exceptions\UnsafeEndpoint;
 use Rooberthh\Switchboard\Models\Delivery;
 use Rooberthh\Switchboard\DataObjects\Outbox\EndpointData;
 use Rooberthh\Switchboard\Support\Outbox\RetrySchedule;
 use Rooberthh\Switchboard\Support\Outbox\SsrfGuard;
 use Rooberthh\Switchboard\Support\StandardWebhooksSignature;
+use Throwable;
 
 /**
  * Send one delivery once, and record what happened.
@@ -74,6 +76,16 @@ final class AttemptDeliveryAction
             $this->retry($delivery, self::attempt(self::since($started), null, $e->getMessage()));
 
             return;
+        } catch (Throwable $e) {
+            // Anything else is a fault on our side, such as a secret that is
+            // not base64. Recorded like any failed attempt, so the delivery
+            // keeps its schedule instead of dying with the job and being
+            // leased again forever, and reported so someone sees it.
+            report($e);
+
+            $this->retry($delivery, self::attempt(self::since($started), null, $e->getMessage()));
+
+            return;
         }
 
         $duration = self::since($started);
@@ -113,6 +125,11 @@ final class AttemptDeliveryAction
         // Never add Guzzle's "stream" option here: streamed requests go
         // through PHP's stream handler, which ignores the curl pin.
         $options = $this->guard->options($delivery->url);
+
+        // An empty key signs, but anyone could produce that signature.
+        if ($endpoint->secret === '') {
+            throw InvalidProviderSecret::empty();
+        }
 
         $message = $delivery->message;
         $timestamp = Carbon::now()->getTimestamp();

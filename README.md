@@ -573,9 +573,10 @@ use Rooberthh\Switchboard\Models\Endpoint;
 $endpoint = Endpoint::query()->create([
     'url' => 'https://customer.example/webhooks',
     'event_types' => ['invoice.paid', 'invoice.voided'],
+    'secret' => Endpoint::generateSecret(),
 ]);
 
-$endpoint->secret; // whsec_... — generated, stored encrypted. Show it to the customer once.
+$endpoint->secret; // whsec_... — stored encrypted. Show it to the customer once.
 ```
 
 Endpoints subscribe to exact event types. There are no wildcards.
@@ -778,7 +779,9 @@ $this->app->bind(Endpoints::class, TenantEndpoints::class);
 The id is recorded on every delivery as a string, with no foreign key, so it
 can be anything stable. Secrets must be Standard Webhooks secrets: `whsec_`
 and base64. To keep an existing secret on Switchboard's own table, pass it
-when creating the endpoint; otherwise one is generated.
+instead of a generated one. An attempt at an endpoint whose secret is empty or
+not base64 sends nothing: it is recorded with the reason, reported, and
+retried on the schedule like any other failed attempt.
 
 ## Testing
 
@@ -855,7 +858,9 @@ classes, registered through the static `Switchboard` class.
 
 Configuration mistakes are loud rather than quiet: a secret that cannot be
 decoded, or a provider that supplies a blank event id, throws instead of turning
-into an endpoint that rejects — or silently discards — every delivery.
+into an endpoint that rejects — or silently discards — every delivery. An
+outbox endpoint whose secret cannot sign is reported, and each attempt at it
+records why.
 
 ## Public API and compatibility
 
