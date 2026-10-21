@@ -13,9 +13,9 @@ use Rooberthh\Switchboard\DataObjects\Outbox\EndpointData;
  * A URL that receives outbound messages, together with the exact event types
  * it subscribes to. The default storage behind the Endpoints contract.
  *
- * Created without a secret, it generates one in the Standard Webhooks format
- * — "whsec_" and 32 random bytes, base64 — and stores it encrypted. Show it to
- * the endpoint's owner once; it is never logged or serialized.
+ * Its secret is given when it is created, usually from generateSecret() —
+ * "whsec_" and 32 random bytes, base64 — and stored encrypted. Show it to the
+ * endpoint's owner once; it is never logged or serialized.
  *
  * Public API, and deliberately not final: an application may extend it.
  *
@@ -48,15 +48,6 @@ class Endpoint extends Model
             'secret' => 'encrypted',
             'disabled_at' => 'datetime',
         ];
-    }
-
-    protected static function booted(): void
-    {
-        static::creating(function (Endpoint $endpoint): void {
-            if (($endpoint->attributes['secret'] ?? null) === null) {
-                $endpoint->secret = self::generateSecret();
-            }
-        });
     }
 
     /**

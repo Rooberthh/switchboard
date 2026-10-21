@@ -20,7 +20,7 @@ beforeEach(function () {
 
 function gone(): Endpoint
 {
-    return Endpoint::query()->create(['url' => 'https://gone.acme.test/hook', 'event_types' => ['invoice.paid']]);
+    return Endpoint::query()->create(['url' => 'https://gone.acme.test/hook', 'event_types' => ['invoice.paid'], 'secret' => Endpoint::generateSecret()]);
 }
 
 it('disables the endpoint and ends the delivery on 410 gone', function () {

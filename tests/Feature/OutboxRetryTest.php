@@ -21,7 +21,7 @@ beforeEach(function () {
     // No jitter, so waits are exact.
     app()->instance(RetrySchedule::class, new RetrySchedule(random: fn(): float => 0.0));
 
-    Endpoint::query()->create(['url' => 'https://hooks.acme.test/hook', 'event_types' => ['invoice.paid']]);
+    Endpoint::query()->create(['url' => 'https://hooks.acme.test/hook', 'event_types' => ['invoice.paid'], 'secret' => Endpoint::generateSecret()]);
 });
 
 function relayNow(): void

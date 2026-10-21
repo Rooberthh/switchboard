@@ -14,7 +14,7 @@ beforeEach(function () {
 
 function deliverTo(string $url): Delivery
 {
-    Endpoint::query()->create(['url' => $url, 'event_types' => ['invoice.paid']]);
+    Endpoint::query()->create(['url' => $url, 'event_types' => ['invoice.paid'], 'secret' => Endpoint::generateSecret()]);
     Switchboard::emit('invoice.paid', ['amount' => 1000]);
 
     test()->artisan('switchboard:outbox:relay')->assertSuccessful();
