@@ -51,6 +51,7 @@ final class InboxMessageLifecycle
      *
      * Verification is not part of it. Whoever calls this has already decided
      * the message is authentic.
+     *
      * @param InboxMessageData $data
      */
     public function ingest(InboxMessageData $data): InboxMessage
