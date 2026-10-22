@@ -496,7 +496,9 @@ php artisan switchboard:relay --provider=stripe --limit=200
 It queues messages that have been unprocessed for longer than they could still
 plausibly be in flight — derived from `inbox.tries`, `inbox.backoff` and your
 queue connection's `retry_after`, and overridable with `inbox.stale_after`. Set
-that yourself if a handler of yours legitimately runs for hours.
+that yourself if a handler of yours legitimately runs for hours, and whenever
+`inbox.tries` is `0`: unlimited attempts have no window to derive, so the relay
+refuses to guess.
 
 **A message is relayed at most once.** That is deliberate: without it, an outage
 amplifies, and a relay running every fifteen minutes against ten thousand
@@ -848,14 +850,14 @@ classes, registered through the static `Switchboard` class.
 | `queue.connection`, `queue.name` | Where processing jobs and delivery attempts go. `null` uses your defaults. |
 | `inbox.path` | Prefix for the conventional endpoint. Default `webhooks`. |
 | `inbox.tolerance` | Seconds either side of now a signed timestamp may be. Default `300`, and symmetric: too old and too far in the future are both rejected. |
-| `inbox.tries` | Attempts a handler gets before the message is recorded as failed. |
+| `inbox.tries` | Attempts a handler gets before the message is recorded as failed. `0` is unlimited, and then `inbox.stale_after` must be set. |
 | `inbox.backoff` | Seconds between attempts. Exponential by default. |
 | `inbox.stale_after` | Seconds a message may be unprocessed before `switchboard:relay` treats its job as lost. `null` derives it from the two rows above and your queue's `retry_after`. |
 | `providers.{name}.secret` | Where a provider's `secret()` reads from by default. Switchboard itself never reads it. |
 | `outbox.idempotency_window` | Seconds an idempotency key holds. Default `86400`. |
 | `outbox.timeout` | Seconds a delivery waits for the endpoint. Default `15`. |
 | `outbox.retry_schedule` | Seconds to wait after each failed attempt. Default: the Standard Webhooks schedule, ten attempts over about three days. |
-| `outbox.lease` | Seconds a queued delivery is left alone before its job is presumed lost and it is queued again. Default `300`. |
+| `outbox.lease` | Seconds a queued delivery is left alone before its job is presumed lost and it is queued again. Default `300`, and never less than `outbox.timeout` plus a minute. |
 | `outbox.allowed_hosts` | Hosts delivered to even though they resolve to a private address. Default none. |
 
 Configuration mistakes are loud rather than quiet: a secret that cannot be

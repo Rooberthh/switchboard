@@ -7,6 +7,7 @@ namespace Rooberthh\Switchboard\Support\Outbox;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Rooberthh\Switchboard\Actions\Outbox\AttemptDeliveryAction;
 use Rooberthh\HttpTools\Enums\StatusCode;
 use Rooberthh\Switchboard\Contracts\Endpoints;
 use Rooberthh\Switchboard\DataObjects\Outbox\EndpointData;
@@ -34,6 +35,11 @@ use Throwable;
 final class DeliveryLifecycle
 {
     private const ERROR_LIMIT = 2000;
+
+    /**
+     * Seconds a queued attempt may wait for a worker, on top of its timeout.
+     */
+    private const LEASE_MARGIN = 60;
 
     public function __construct(
         private readonly Endpoints $endpoints,
@@ -273,10 +279,15 @@ final class DeliveryLifecycle
 
     /**
      * Long enough for a queued attempt to be picked up and finish, request
-     * timeout included; after it, the relay presumes the job lost.
+     * timeout included; after it, the relay presumes the job lost. A lease
+     * shorter than the timeout would queue a second attempt while the first
+     * is still waiting on the endpoint, so it never is.
      */
     private static function lease(): int
     {
-        return max(60, (int) config('switchboard.outbox.lease', 300));
+        return max(
+            (int) config('switchboard.outbox.lease', 300),
+            AttemptDeliveryAction::timeout() + self::LEASE_MARGIN,
+        );
     }
 }

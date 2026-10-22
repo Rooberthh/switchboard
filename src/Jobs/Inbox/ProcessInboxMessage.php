@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Rooberthh\Switchboard\Support\Inbox\InboxMessageLifecycle;
 use Rooberthh\Switchboard\Support\Inbox\InboxMessages;
+use Rooberthh\Switchboard\Support\Inbox\ProcessingPolicy;
 use Rooberthh\Switchboard\Switchboard;
 use Throwable;
 
@@ -28,7 +29,7 @@ final class ProcessInboxMessage implements ShouldQueue
 
     public function __construct(public readonly int $inboxMessageId)
     {
-        $this->tries = (int) config('switchboard.inbox.tries', 5);
+        $this->tries = ProcessingPolicy::tries();
 
         $this->onConnection(config('switchboard.queue.connection'));
         $this->onQueue(config('switchboard.queue.name'));
@@ -39,10 +40,7 @@ final class ProcessInboxMessage implements ShouldQueue
      */
     public function backoff(): array
     {
-        /** @var list<int> $backoff */
-        $backoff = config('switchboard.inbox.backoff') ?: [10, 60, 360, 2160];
-
-        return $backoff;
+        return ProcessingPolicy::backoff();
     }
 
     public function handle(): void

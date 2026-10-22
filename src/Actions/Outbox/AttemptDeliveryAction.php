@@ -180,7 +180,7 @@ final class AttemptDeliveryAction
         return $at === false ? null : max(0, $at - Carbon::now()->getTimestamp());
     }
 
-    private static function timeout(): int
+    public static function timeout(): int
     {
         return max(1, (int) config('switchboard.outbox.timeout', 15));
     }

@@ -219,6 +219,20 @@ it('queues only deliveries that are due, and leases what it queues', function ()
     Queue::assertPushed(AttemptDelivery::class, 2);
 });
 
+it('never leases a delivery for less than its request may take', function () {
+    Queue::fake();
+    $this->freezeTime();
+    config(['switchboard.outbox.timeout' => 600, 'switchboard.outbox.lease' => 300]);
+
+    endpoint();
+    Switchboard::emit('invoice.paid');
+
+    relay();
+
+    // The timeout, plus a minute for the job to be picked up.
+    expect(Delivery::query()->sole()->next_attempt_at->getTimestamp())->toBe(now()->addSeconds(660)->getTimestamp());
+});
+
 it('puts the lease back when the queue will not take the job', function () {
     config(['queue.default' => 'database']);
     Schema::drop('jobs');

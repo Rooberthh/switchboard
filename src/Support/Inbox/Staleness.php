@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard\Support\Inbox;
 
 use Illuminate\Support\Carbon;
+use Rooberthh\Switchboard\Exceptions\InvalidConfiguration;
 
 /**
  * How long a message may sit unprocessed before the relay treats it as lost.
@@ -44,7 +45,11 @@ final class Staleness
             return (int) $configured;
         }
 
-        $tries = max(1, (int) config('switchboard.inbox.tries', 5));
+        if (ProcessingPolicy::unlimited()) {
+            throw InvalidConfiguration::unlimitedTriesWithoutStaleAfter();
+        }
+
+        $tries = ProcessingPolicy::tries();
 
         return ($tries * self::retryAfter() + self::backoff($tries)) * self::MARGIN;
     }
@@ -59,20 +64,12 @@ final class Staleness
      */
     private static function backoff(int $tries): int
     {
-        /** @var array<int, int|string> $backoff */
-        $backoff = array_values(array_filter(
-            (array) config('switchboard.inbox.backoff', []),
-            static fn(mixed $seconds): bool => is_numeric($seconds),
-        ));
-
-        if ($backoff === []) {
-            return 0;
-        }
+        $backoff = ProcessingPolicy::backoff();
 
         $total = 0;
 
         for ($attempt = 1; $attempt < $tries; $attempt++) {
-            $total += (int) ($backoff[$attempt - 1] ?? end($backoff));
+            $total += $backoff[$attempt - 1] ?? $backoff[array_key_last($backoff)];
         }
 
         return $total;

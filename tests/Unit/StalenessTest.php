@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Carbon;
+use Rooberthh\Switchboard\Exceptions\InvalidConfiguration;
 use Rooberthh\Switchboard\Support\Inbox\Staleness;
 
 beforeEach(function () {
@@ -59,10 +60,30 @@ it('falls back to a sane retry_after for a connection that declares none', funct
     expect(Staleness::seconds())->toBe((2590 + 5 * 60) * 2);
 });
 
-it('is never shorter than a single attempt, whatever the configuration', function () {
-    config(['switchboard.inbox.tries' => 0, 'switchboard.inbox.backoff' => []]);
+it('refuses to derive a window for unlimited tries', function () {
+    // Zero tries is unlimited to the queue, so a message could legitimately be
+    // in flight forever and no derived window is long enough.
+    config(['switchboard.inbox.tries' => 0]);
 
-    expect(Staleness::seconds())->toBeGreaterThan(0);
+    expect(fn() => Staleness::seconds())->toThrow(InvalidConfiguration::class);
+});
+
+it('takes an explicitly configured window for unlimited tries', function () {
+    config(['switchboard.inbox.tries' => 0, 'switchboard.inbox.stale_after' => 7200]);
+
+    expect(Staleness::seconds())->toBe(7200);
+});
+
+it('outlasts the backoff the job falls back to when none is configured', function () {
+    config(['switchboard.inbox.backoff' => []]);
+
+    expect(Staleness::seconds())->toBe((2590 + 5 * 60) * 2);
+});
+
+it('ignores the backoff entries the job ignores', function () {
+    config(['switchboard.inbox.backoff' => ['soon', 30]]);
+
+    expect(Staleness::seconds())->toBe((4 * 30 + 5 * 60) * 2);
 });
 
 it('offers the cutoff as a moment, not a duration', function () {

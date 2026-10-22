@@ -7,7 +7,7 @@ use Rooberthh\Switchboard\Switchboard;
 use Rooberthh\Switchboard\Tests\Fixtures\ThrowingHandler;
 use Rooberthh\Switchboard\Tests\Fixtures\ThrowingProvider;
 use Illuminate\Testing\TestResponse;
-use Rooberthh\Switchboard\Jobs\Inbox\ProcessInboxMessage;
+use Rooberthh\Switchboard\Support\Inbox\ProcessingPolicy;
 
 beforeEach(function () {
     ThrowingHandler::$attempts = 0;
@@ -118,7 +118,7 @@ it('backs off exponentially between attempts', function () {
 
     config(['switchboard.inbox.backoff' => $shipped]);
 
-    $backoff = (new ProcessInboxMessage(1))->backoff();
+    $backoff = ProcessingPolicy::backoff();
 
     expect($backoff)->toBe($shipped)
         ->and($backoff)->not->toBeEmpty();

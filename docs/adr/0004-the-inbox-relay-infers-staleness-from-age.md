@@ -19,5 +19,6 @@ The relay cannot ask whether a worker is holding a message right now, because th
 - **Processing is at-least-once, and now visibly so.** The relay can re-dispatch a message that a worker is still handling, if that worker exceeds the derived window. Handlers must be idempotent — which was already true, because queue retries re-run a handler that throws halfway, and is now documented.
 - A relayed message starts again at attempt one, so its lifetime handler runs can exceed `inbox.tries`.
 - An application whose handlers legitimately run for longer than the derived window must set `inbox.stale_after` itself.
+- The window is derived from the same retry policy the processing job reads, so the two cannot disagree. `inbox.tries = 0` is unlimited to the queue, so there is no finite window: the relay refuses to run without `inbox.stale_after` rather than guess one shorter than a message's real lifetime.
 - A message the relay cannot fix stays unprocessed forever, by design: it is a symptom of something the relay cannot repair, most often workers not consuming the configured queue at all. The command reports these rather than retrying them, which is the only signal an operator gets for that misconfiguration.
 - Messages stranded and then recovered are indistinguishable afterwards from messages that were never stranded, except by `relayed_at`.

@@ -52,7 +52,9 @@ return [
     |
     | "tries" and "backoff" are how a message is processed: how many attempts a
     | handler gets before the message is recorded as failed, and how many
-    | seconds to wait between them.
+    | seconds to wait between them. 0 tries is unlimited, as it is to the
+    | queue, and then "stale_after" must be set. A backoff with no numbers in it
+    | falls back to the default.
     |
     | "stale_after" is how many seconds a message may sit unprocessed before
     | switchboard:relay treats its job as lost and queues it again. Null
@@ -88,7 +90,8 @@ return [
     |
     | "lease" is how long a queued delivery is left alone by the relay before
     | its job is presumed lost and it is queued again. Keep it comfortably
-    | longer than "timeout" plus the time a job waits on your queue.
+    | longer than "timeout" plus the time a job waits on your queue. It is never
+    | shorter than "timeout" plus a minute, whatever it is set to.
     |
     | "allowed_hosts" are hosts delivered to even though they resolve to a
     | private or reserved address. Everything else must resolve to the public
