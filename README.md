@@ -405,6 +405,8 @@ the handler:
 | `InboxMessageFailed` | The attempts are spent and `failed_at` is set. This is the one to alert on. |
 
 Each carries the message; `InboxMessageFailed` also carries the exception.
+A message is marked processed or failed once, whichever comes first, so each
+fires at most once per message, and again only after a replay.
 
 ```php
 use Rooberthh\Switchboard\Events\InboxMessageFailed;

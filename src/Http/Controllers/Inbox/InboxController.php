@@ -6,7 +6,7 @@ namespace Rooberthh\Switchboard\Http\Controllers\Inbox;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Rooberthh\Switchboard\Actions\Inbox\CreateInboxMessageAction;
+use Rooberthh\Switchboard\Support\Inbox\InboxMessageLifecycle;
 use Rooberthh\Switchboard\Exceptions\InvalidInboxMessage;
 use Rooberthh\Switchboard\Switchboard;
 use Throwable;
@@ -53,7 +53,7 @@ final class InboxController
             throw InvalidInboxMessage::providerMismatch($webhookProvider::name(), $data->provider);
         }
 
-        app(CreateInboxMessageAction::class)->execute($data);
+        app(InboxMessageLifecycle::class)->ingest($data);
 
         return response()->noContent();
     }

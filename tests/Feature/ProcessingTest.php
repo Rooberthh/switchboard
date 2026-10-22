@@ -200,3 +200,38 @@ it('does not process a message twice', function () {
 
     expect(RecordingHandler::$calls)->toBe(['invoice.paid:evt_1']);
 });
+
+it('leaves a message failed when its handler succeeds after another job failed it', function () {
+    // The relay queued a second copy while the first was still retrying. The
+    // first spends its attempts and fails the message while the second's
+    // handler is running; the second must then finish quietly, not throw and
+    // run the handler again.
+    $handler = new class {
+        public function __invoke(InboxMessage $message): void
+        {
+            RecordingHandler::$calls[] = "racing:{$message->event_id}";
+
+            InboxMessage::query()->whereKey($message->id)->update([
+                'failed_at' => now(),
+                'last_error' => 'the first job gave up',
+            ]);
+        }
+    };
+
+    providerHandling(['invoice.paid' => $handler::class]);
+
+    // A real queue with retries left, so a throw would show as the handler
+    // running again.
+    config(['queue.default' => 'database', 'switchboard.inbox.tries' => 3, 'switchboard.inbox.backoff' => [0]]);
+
+    send()->assertNoContent();
+
+    $this->artisan('queue:work', ['--stop-when-empty' => true])->run();
+
+    $message = InboxMessage::query()->sole();
+
+    expect(RecordingHandler::$calls)->toBe(['racing:evt_1'])
+        ->and($message->refresh()->isFailed())->toBeTrue()
+        ->and($message->isProcessed())->toBeFalse()
+        ->and($message->last_error)->toBe('the first job gave up');
+});

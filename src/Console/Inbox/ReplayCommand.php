@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Rooberthh\Switchboard\Console\Inbox;
 
 use Illuminate\Console\Command;
-use Rooberthh\Switchboard\Actions\Inbox\ReplayInboxMessageAction;
+use Rooberthh\Switchboard\Support\Inbox\InboxMessageLifecycle;
 use Rooberthh\Switchboard\Support\Inbox\InboxMessages;
 use Rooberthh\Switchboard\Models\InboxMessage;
 
@@ -84,15 +84,15 @@ final class ReplayCommand extends Command
         }
 
         $replayed = 0;
-        $replay = app(ReplayInboxMessageAction::class);
+        $lifecycle = app(InboxMessageLifecycle::class);
 
         // Paged by id, not by offset: clearing failed_at removes the row from
         // this query, so offset paging would step over as many messages as it
         // replayed.
-        (clone $query)->failed()->eachById(function (InboxMessage $message) use (&$replayed, $replay): void {
-            $replay->execute($message);
-
-            $replayed++;
+        (clone $query)->failed()->eachById(function (InboxMessage $message) use (&$replayed, $lifecycle): void {
+            if ($lifecycle->replay($message)) {
+                $replayed++;
+            }
         });
 
         // Asked for one message and replayed nothing: say why, and fail, so a

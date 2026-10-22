@@ -13,7 +13,7 @@ use stdClass;
 /**
  * Persist one outbox message, and announce it — once.
  *
- * The outbox's counterpart to CreateInboxMessageAction. It generates the
+ * The outbox's counterpart to InboxMessageLifecycle::ingest(). It generates the
  * event ID and renders the envelope, once, as the body every endpoint and
  * every attempt will send (ADR-0006). With an idempotency key it inserts
  * first and recovers from the unique index, so a key already taken returns

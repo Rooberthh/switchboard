@@ -58,7 +58,7 @@ A message that has neither succeeded nor failed yet. Switchboard has no in-fligh
 _Avoid_: pending, queued, in progress
 
 **Marking processed**:
-Recording that a handler succeeded. Distinct from *processing*, which is the handler running on the queue: the handler does the work, marking is the record of it, and only the record moves a message out of unprocessed. The same split holds for failing a message.
+Recording that a handler succeeded. Distinct from *processing*, which is the handler running on the queue: the handler does the work, marking is the record of it, and only the record moves a message out of unprocessed. The same split holds for failing a message. A message is marked processed or failed once, and whichever comes first stands until it is replayed.
 _Avoid_: completing, finishing, closing
 
 **Reconciliation**:

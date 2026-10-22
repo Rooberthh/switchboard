@@ -8,8 +8,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Rooberthh\Switchboard\Actions\Inbox\FailInboxMessageAction;
-use Rooberthh\Switchboard\Actions\Inbox\ProcessInboxMessageAction;
+use Rooberthh\Switchboard\Support\Inbox\InboxMessageLifecycle;
 use Rooberthh\Switchboard\Support\Inbox\InboxMessages;
 use Rooberthh\Switchboard\Switchboard;
 use Throwable;
@@ -64,7 +63,7 @@ final class ProcessInboxMessage implements ShouldQueue
             app($handler)($message);
         }
 
-        app(ProcessInboxMessageAction::class)->execute($message);
+        app(InboxMessageLifecycle::class)->processed($message);
     }
 
     /**
@@ -76,13 +75,10 @@ final class ProcessInboxMessage implements ShouldQueue
     {
         $message = InboxMessages::find($this->inboxMessageId);
 
-        // The processed check stays here rather than inside the act: a late
-        // failure callback for a message another worker already finished is a
-        // race the queue genuinely produces, not a violation.
-        if ($message === null || $message->isProcessed()) {
+        if ($message === null) {
             return;
         }
 
-        app(FailInboxMessageAction::class)->execute($message, $exception);
+        app(InboxMessageLifecycle::class)->failed($message, $exception);
     }
 }

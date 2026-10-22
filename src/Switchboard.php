@@ -6,7 +6,7 @@ namespace Rooberthh\Switchboard;
 
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as RouteFacade;
-use Rooberthh\Switchboard\Actions\Inbox\CreateInboxMessageAction;
+use Rooberthh\Switchboard\Support\Inbox\InboxMessageLifecycle;
 use Rooberthh\Switchboard\Actions\Outbox\EmitOutboxMessageAction;
 use Rooberthh\Switchboard\Contracts\WebhookProvider;
 use Rooberthh\Switchboard\Exceptions\InvalidProvider;
@@ -146,7 +146,7 @@ final class Switchboard
             throw UnknownProvider::for($data->provider);
         }
 
-        return app(CreateInboxMessageAction::class)->execute($data);
+        return app(InboxMessageLifecycle::class)->ingest($data);
     }
 
     /**

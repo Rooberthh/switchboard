@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
-use Rooberthh\Switchboard\Actions\Inbox\RelayInboxMessageAction;
+use Rooberthh\Switchboard\Support\Inbox\InboxMessageLifecycle;
 use Rooberthh\Switchboard\Support\Inbox\InboxMessages;
 use Rooberthh\Switchboard\Support\Inbox\Staleness;
 use Rooberthh\Switchboard\Models\InboxMessage;
@@ -70,14 +70,14 @@ final class RelayCommand extends Command
     private function relay(Builder $query): int
     {
         $relayed = 0;
-        $relay = app(RelayInboxMessageAction::class);
+        $lifecycle = app(InboxMessageLifecycle::class);
 
         // Paged by id rather than by offset, like replay: the predicate this
         // pages through is one the sweep itself changes.
-        $query->eachById(function (InboxMessage $message) use (&$relayed, $relay): void {
-            $relay->execute($message);
-
-            $relayed++;
+        $query->eachById(function (InboxMessage $message) use (&$relayed, $lifecycle): void {
+            if ($lifecycle->relay($message)) {
+                $relayed++;
+            }
         });
 
         return $relayed;
