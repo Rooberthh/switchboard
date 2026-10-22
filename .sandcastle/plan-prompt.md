@@ -10,6 +10,18 @@ Here are the open issues in the repo:
 
 The list above has already been filtered to issues ready for work.
 
+# IN REVIEW
+
+These branches have an open pull request:
+
+<open-pull-requests>
+
+!`gh pr list --state open --json number,headRefName --jq '[.[] | {number, branch: .headRefName}]'`
+
+</open-pull-requests>
+
+An issue whose branch `sandcastle/issue-{id}` is listed here is **in review**: it is done and waits for a human to merge it. Sandcastle never merges. Never include an issue in review in the plan, but still count it as an open issue that can block others, because its code is not on the current branch yet.
+
 # TASK
 
 Analyze the open issues and build a dependency graph. For each issue, determine whether it **blocks** or **is blocked by** any other open issue.
@@ -32,6 +44,6 @@ Output your plan as a JSON object wrapped in `<plan>` tags:
 {"issues": [{"id": "42", "title": "Fix auth bug", "branch": "sandcastle/issue-42"}]}
 </plan>
 
-Include only unblocked issues. If every issue is blocked, include the single highest-priority candidate (the one with the fewest or weakest dependencies).
+Include only unblocked issues. If every issue is blocked, include the single highest-priority candidate (the one with the fewest or weakest dependencies), unless an issue in review blocks it: then it waits for that merge, so leave it out.
 
 Always emit the `<plan>` tags, even when there is nothing to do. If there are no issues to work on at all, output `<plan>{"issues": []}</plan>` so the run can exit cleanly.
