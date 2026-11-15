@@ -42,11 +42,11 @@ Add a seam only for a real integration need, never for internal layering.
 
 ### Issue tracker
 
-Issues live in GitHub Issues at `Rooberthh/switchboard`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues at `Rooberthh/switchboard`, via the `gh` CLI. See `~/code/home/docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-The five canonical labels, unchanged: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+The five canonical labels, unchanged: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `~/code/home/docs/agents/triage-labels.md`.
 
 ### Domain docs
 
