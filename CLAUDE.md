@@ -48,6 +48,10 @@ Issues live in GitHub Issues at `Rooberthh/switchboard`, via the `gh` CLI. See `
 
 The five canonical labels, unchanged: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `~/code/home/docs/agents/triage-labels.md`.
 
+### Sandcastle
+
+Sandcastle works through the `ready-for-agent` issues. It runs from home, not from here: `npm run sandcastle -- switchboard` in `~/code/home` (see `~/code/home/.sandcastle/README.md`). This repo's settings live in `.sandcastle/`.
+
 ### Domain docs
 
 Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.

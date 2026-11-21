@@ -1,0 +1,3 @@
+- `composer check` runs `pint --test`, so it fails on formatting. Run `composer pint` to fix it.
+- PHPStan runs at level 8. Fix what it reports; don't add `@phpstan-ignore` comments or widen types to `mixed` to silence it.
+- Read `GLOSSARY.md` and the relevant `docs/adr/` before designing anything new.

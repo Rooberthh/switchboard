@@ -1,0 +1,5 @@
+{
+  "imageName": "sandcastle:switchboard",
+  "copyToWorktree": ["vendor"],
+  "checks": ["composer check"]
+}
