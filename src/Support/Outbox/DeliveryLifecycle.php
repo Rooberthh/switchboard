@@ -7,7 +7,7 @@ namespace Rooberthh\Switchboard\Support\Outbox;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Rooberthh\HttpTools\Enums\StatusCode;
+use Rooberthh\Switchboard\Support\StatusCode;
 use Rooberthh\Switchboard\Actions\Outbox\AttemptDeliveryAction;
 use Rooberthh\Switchboard\Contracts\Endpoints;
 use Rooberthh\Switchboard\DataObjects\Outbox\EndpointData;
