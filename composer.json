@@ -27,8 +27,7 @@
         "illuminate/http": "^13.0",
         "illuminate/queue": "^13.0",
         "illuminate/routing": "^13.0",
-        "illuminate/support": "^13.0",
-        "rooberthh/php-http-tools": "^0.1.2"
+        "illuminate/support": "^13.0"
     },
     "require-dev": {
         "larastan/larastan": "^3.0",
